@@ -1,5 +1,5 @@
 import type { TodoItem, TodoWriteDetails } from "./types.js";
-import { TODO_STATE_ENTRY_TYPE, TOOL_WRITE } from "./types.js";
+import { TODO_STATE_ENTRY_TYPE, TOOL_UPDATE, TOOL_WRITE } from "./types.js";
 import { TERMINAL_STATUSES, TODO_PRIORITIES, TODO_STATUSES } from "./types.js";
 
 type BranchEntry = {
@@ -36,8 +36,9 @@ function isWriteDetails(value: unknown): value is TodoWriteDetails {
  * Replay todo state from the session branch.
  *
  * Pi guarantees getBranch() returns entries in root→leaf (chronological) order.
- * Last valid entry wins — custom `pi-todo.state` entries and `todo_write`
- * toolResult details are both tracked.
+ * Last valid entry wins — custom `pi-todo.state` entries plus both mutation
+ * toolResult details are tracked. Tool-result replay is a fallback when a
+ * compaction retains messages but drops old custom entries.
  *
  * Error envelopes (e.g. validation failures) are skipped so they never
  * overwrite a good state.
@@ -59,7 +60,12 @@ export function replayFromBranch(ctx: {
 
     if (e.type !== "message" || !isRecord(e.message)) continue;
     const msg = e.message as Record<string, unknown>;
-    if (msg.role !== "toolResult" || msg.toolName !== TOOL_WRITE) continue;
+    if (
+      msg.role !== "toolResult" ||
+      (msg.toolName !== TOOL_WRITE && msg.toolName !== TOOL_UPDATE)
+    ) {
+      continue;
+    }
     if (!isWriteDetails(msg.details)) continue;
     // Skip error envelopes — they did not commit
     if ((msg.details as TodoWriteDetails).error) continue;

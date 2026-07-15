@@ -108,7 +108,7 @@ describe("open / running counts", () => {
 });
 
 describe("selectOverlayLayout", () => {
-  it("drops terminal first on overflow (B5)", () => {
+  it("keeps the earliest timeline items and pins an active item outside the prefix", () => {
     const todos = [
       t("done1", "completed"),
       t("done2", "completed"),
@@ -117,27 +117,27 @@ describe("selectOverlayLayout", () => {
       t("p2", "pending"),
       t("p3", "pending"),
     ];
-    // maxLines=4 → bodyBudget=3 → innerBudget=2 with +N more
     const layout = selectOverlayLayout(todos, 4);
-    expect(layout.visible.some((x) => x.content === "active")).toBe(true);
-    expect(layout.visible.every((x) => x.status !== "completed")).toBe(true);
+    expect(layout.visible.map((x) => x.content)).toEqual(["done1"]);
+    expect(layout.pinnedActive?.content).toBe("active");
     expect(layout.hiddenCount).toBeGreaterThan(0);
   });
 
-    it("puts in_progress first when all items fit", () => {
+    it("preserves checklist sequence when all items fit", () => {
       const todos = [t("a", "pending"), t("b", "in_progress"), t("c", "completed")];
       const layout = selectOverlayLayout(todos, 12);
-      expect(layout.visible.map((x) => x.content)).toEqual(["b", "a", "c"]);
+      expect(layout.visible.map((x) => x.content)).toEqual(["a", "b", "c"]);
       expect(layout.hiddenCount).toBe(0);
     });
 
-  it("keeps in_progress visible even when many pending overflow", () => {
+  it("keeps in_progress visible when it is within the timeline prefix", () => {
     const todos = [
       t("active", "in_progress"),
       ...Array.from({ length: 20 }, (_, i) => t(`p${i}`, "pending")),
     ];
     const layout = selectOverlayLayout(todos, 5);
-    expect(layout.visible.some((x) => x.status === "in_progress")).toBe(true);
+      expect(layout.visible.some((x) => x.status === "in_progress")).toBe(true);
+    expect(layout.pinnedActive).toBeUndefined();
   });
 });
 
@@ -186,6 +186,23 @@ describe("renderOverlayLines", () => {
     expect(renderOverlayLines([], identityTheme, 80)).toEqual([]);
   });
 
+  it("never exceeds maxLines when an active item is pinned during overflow", () => {
+    const lines = renderOverlayLines(
+      [
+        t("done-1", "completed"),
+        t("done-2", "completed"),
+        t("active", "in_progress"),
+        t("next", "pending"),
+      ],
+      identityTheme,
+      80,
+      { maxLines: 5 },
+    );
+    expect(lines).toHaveLength(5);
+    expect(lines).toContain("Active: [•] active");
+    expect(lines.some((line) => line.includes("+2 more"))).toBe(true);
+  });
+
   it("counts ignore completed/cancelled for open/running", () => {
     const lines = renderOverlayLines(
       [
@@ -215,7 +232,7 @@ describe("formatTodoListText", () => {
 });
 
 describe("selectOverlayLayout overflow edge cases", () => {
-  it("terminal collapsed: only +N done shown, no +N more for same items", () => {
+    it("does not regroup terminal items on overflow", () => {
     const todos = [
       t("ip", "in_progress"),
       t("p1", "pending"),
@@ -224,15 +241,14 @@ describe("selectOverlayLayout overflow edge cases", () => {
       t("c2", "completed"),
       t("c3", "completed"),
     ];
-    // maxLines=5 → bodyBudget=4 → innerBudget=3
-    // picks [ip, p1, p2], remaining=[c1,c2,c3] all terminal
     const layout = selectOverlayLayout(todos, 5);
     expect(layout.visible).toHaveLength(3);
-    expect(layout.terminalCount).toBe(3);
-    expect(layout.hiddenCount).toBe(0); // all remaining are terminal → +3 done, no +N more
+    expect(layout.visible.map((todo) => todo.content)).toEqual(["ip", "p1", "p2"]);
+    expect(layout.terminalCount).toBe(0);
+    expect(layout.hiddenCount).toBe(3);
   });
 
-  it("terminal collapsed + open overflow: +N done AND +N more (non-overlapping)", () => {
+    it("counts every omitted item in one non-overlapping overflow summary", () => {
     const todos = [
       t("ip", "in_progress"),
       t("p1", "pending"),
@@ -242,13 +258,10 @@ describe("selectOverlayLayout overflow edge cases", () => {
       t("c1", "completed"),
       t("c2", "completed"),
     ];
-    // maxLines=5 → bodyBudget=4 → innerBudget=3
-    // picks [ip, p1, p2], remaining=[p3, p4, c1, c2]
-    // terminal collapsed: [c1,c2]
     const layout = selectOverlayLayout(todos, 5);
     expect(layout.visible).toHaveLength(3);
-    expect(layout.terminalCount).toBe(2);    // c1, c2
-    expect(layout.hiddenCount).toBe(2);      // p3, p4 (open items pushed out)
+    expect(layout.terminalCount).toBe(0);
+    expect(layout.hiddenCount).toBe(4);
   });
 
   it("no terminal items: only +N more shown", () => {
@@ -258,7 +271,20 @@ describe("selectOverlayLayout overflow edge cases", () => {
     expect(layout.hiddenCount).toBeGreaterThan(0);
   });
 
-  it("in_progress always first even when many completed exist", () => {
+    it("renders a pinned Active row without changing timeline order", () => {
+      const todos = [
+        t("done-1", "completed"),
+        t("done-2", "completed"),
+        t("active", "in_progress"),
+        t("next", "pending"),
+      ];
+      const lines = renderOverlayLines(todos, identityTheme, 80, { maxLines: 5 });
+      expect(lines).toContain("[✓] done-1");
+      expect(lines).toContain("Active: [•] active");
+      expect(lines).not.toContain("[✓] done-2");
+    });
+
+    it("preserves completed work before the active follow-up when all items fit", () => {
     const todos = [
       t("c1", "completed"),
       t("c2", "completed"),
@@ -268,11 +294,10 @@ describe("selectOverlayLayout overflow edge cases", () => {
       t("ip", "in_progress"),
     ];
     const layout = selectOverlayLayout(todos, 7);
-    expect(layout.visible[0].content).toBe("ip");
-    // all 6 fit, no overflow -> no terminal collapse
+    expect(layout.visible.map((todo) => todo.content)).toEqual(["c1", "c2", "c3", "c4", "c5", "ip"]);
   });
 
-  it("statusPrioritySort orders correctly by status then priority", () => {
+    it("preserves original sequence instead of regrouping by status or priority", () => {
     const todos = [
       t("low-pending", "pending", "low"),
       t("high-ip", "in_progress", "high"),
@@ -280,26 +305,14 @@ describe("selectOverlayLayout overflow edge cases", () => {
       t("high-completed", "completed", "high"),
       t("low-ip", "in_progress", "low"),
     ];
-    const sorted = [...todos].sort(
-      // import the internal function... test indirectly via selectOverlayLayout
-    );
-    // All fit
     const layout = selectOverlayLayout(todos, 10);
     const contents = layout.visible.map((x) => x.content);
-    // in_progress first (by priority: high then low)
-    expect(contents.indexOf("high-ip")).toBeLessThan(contents.indexOf("low-ip"));
-    // pending after in_progress
-    expect(contents.indexOf("low-pending")).toBeGreaterThan(contents.indexOf("low-ip"));
-    expect(contents.indexOf("medium-pending")).toBeGreaterThan(contents.indexOf("low-ip"));
-    // terminal last
-    expect(contents.indexOf("high-completed")).toBeGreaterThan(
-      Math.max(contents.indexOf("low-pending"), contents.indexOf("medium-pending")),
-    );
+    expect(contents).toEqual(todos.map((todo) => todo.content));
   });
 });
 
-describe("formatTodoListText status sort", () => {
-  it("in_progress first, then pending, then terminal", () => {
+describe("formatTodoListText timeline order", () => {
+    it("keeps completed, pending, and running items in checklist sequence", () => {
     const todos = [
       t("completed", "completed"),
       t("pending", "pending"),
@@ -307,14 +320,12 @@ describe("formatTodoListText status sort", () => {
     ];
     const text = formatTodoListText(todos, "summary");
     const lines = text.split("\n");
-    expect(lines[1]).toContain("[•]");     // in_progress first
-    expect(lines[2]).toContain("[ ]");     // pending second
-    expect(lines[3]).toContain("[✓]");     // terminal last
+    expect(lines[1]).toContain("[✓]");
+    expect(lines[2]).toContain("[ ]");
+    expect(lines[3]).toContain("[•]");
   });
 
-  it("overflow preserves status ordering (in_progress > pending > terminal)", () => {
-    // Fill with many pending so first MAX_RESULT_LINES items are all pending
-    // but in_progress should still bubble to front
+    it("overflow keeps the earliest checklist items", () => {
     const todos = [
       t("done", "completed"),
       ...Array.from({ length: MAX_RESULT_LINES + 2 }, (_, i) => t(`p${i}`, "pending")),
@@ -322,8 +333,7 @@ describe("formatTodoListText status sort", () => {
     ];
     const text = formatTodoListText(todos, "summary");
     const lines = text.split("\n");
-    // First line after summary should be in_progress
-    expect(lines[1]).toContain("[•]");
-    expect(lines[1]).toContain("active");
+    expect(lines[1]).toContain("[✓]");
+    expect(lines[1]).toContain("done");
   });
 });

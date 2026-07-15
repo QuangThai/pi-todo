@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.1 (2026-07-15)
+
+### Fixed
+
+- **Durable `todo_update` replay**: Replays successful `todo_update` tool results
+  as a fallback when compaction retains tool messages but prunes older custom
+  state entries. Verified in a live Pi `write → update → /compact → /reload →
+  todo_diagnose` lifecycle.
+- **Completion reminders**: Completion and cadence reminders now direct agents
+  to patch known IDs with `todo_update`, rather than unnecessarily replacing
+  the full checklist. A successful update also clears pending intent nudges.
+- **Timeline overlay boundaries**: The overlay preserves checklist order,
+  pins an out-of-view active item, and never renders more than `maxLines`.
+
 ## 0.3.0 (2026-07-15)
 
 - **ID invariant hardening**: `validateTodoWrite` rejects items with explicit `id`

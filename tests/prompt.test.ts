@@ -26,4 +26,9 @@ describe("prompt guidance", () => {
     );
     expect(TODOWRITE_GUIDELINES[0]).toMatch(/explain\/explore\/review/i);
   });
+
+  it("documents todo_update as the ID-based patch tool", () => {
+    expect(TODOWRITE_GUIDELINES.join("\n")).toContain("todo_update");
+    expect(TASK_MANAGEMENT_SECTION).toContain("todo_update");
+  });
 });

@@ -85,7 +85,7 @@ export function drainReminderForContext(state: CadenceState): boolean {
   return true;
 }
 
-/** Default: 4 turns without todo_write/todo_read while open work remains. */
+/** Default: 4 turns without a todo tool while open work remains. */
 export const REMINDER_INTERVAL = 4;
 
 /**
@@ -101,7 +101,7 @@ export function buildSystemReminder(todos: readonly TodoItem[]): string | null {
 
   const focus =
     inProgress.length > 0
-      ? `Active item still in_progress: "${inProgress[0].content}". If that work is finished, call todo_write immediately with it marked completed (full replace), then set the next pending item to in_progress (exactly one). Do not leave a stale [•] after finishing a step.`
+      ? `Active item still in_progress: "${inProgress[0].content}". If that work is finished, use todo_update to patch its known ID, or todo_write for a full replacement, and mark it completed; then set the next pending item to in_progress in the same mutation. Do not leave a stale [•] after finishing a step.`
       : `Open items are still pending with none in_progress. If you are about to work, call todo_write and mark exactly one item in_progress before continuing.`;
 
   return `<system-reminder>

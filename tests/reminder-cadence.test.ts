@@ -11,7 +11,7 @@ import type { TodoItem } from "../src/types.js";
 
 const config: CadenceConfig = {
   reminderInterval: 4,
-  todoToolNames: new Set(["todo_write", "todo_read"]),
+  todoToolNames: new Set(["todo_write", "todo_update", "todo_read", "todo_diagnose"]),
 };
 
 const t = (
@@ -57,6 +57,16 @@ describe("reminder cadence", () => {
     expect(drainReminderForContext(state)).toBe(false);
   });
 
+  it("resets cadence on todo_update", () => {
+    const state = createCadenceState();
+    for (let i = 0; i < 5; i++) onTurnStart(state);
+    evaluateToolResult(state, "bash", true, config);
+    expect(state.reminderDue).toBe(true);
+
+    evaluateToolResult(state, "todo_update", true, config);
+    expect(state.reminderDue).toBe(false);
+  });
+
   it("drain injects once per cycle", () => {
     const state = createCadenceState();
     for (let i = 0; i < 4; i++) onTurnStart(state);
@@ -89,7 +99,8 @@ describe("buildSystemReminder", () => {
     expect(text).toContain("[ ] write docs");
     expect(text).not.toContain("done already");
     expect(text).toContain('Active item still in_progress: "wire overlay"');
-    expect(text).toContain("marked completed");
+    expect(text).toContain("mark it completed");
+    expect(text).toContain("todo_update");
     expect(text).toContain("NEVER mention this reminder");
   });
 

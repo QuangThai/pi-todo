@@ -1,7 +1,8 @@
 /**
  * pi-todo — OpenCode-like session todo checklist for Pi.
  *
- * Tools: todo_write (full replace), todo_read, todo_diagnose (read-only)
+ * Tools: todo_write (full replace), todo_update (patch by ID), todo_read,
+ *        todo_diagnose (read-only)
  * Overlay: # Todos with [ ]/[•]/[✓]/[×] above the editor
  * Persistence: toolResult details + custom entry, replayed from branch
  * Reminder: pi-tasks-style cadence → transient <system-reminder> via context
@@ -180,10 +181,11 @@ export default function (pi: ExtensionAPI): void {
   });
 
   // Refresh from in-memory store — do NOT replayFromBranch here (branch is stale).
-  // Clear intent nudge once todo_write succeeds (model complied; avoid double-inject).
-  pi.on("tool_execution_end", async (event) => {
-    if (event.toolName !== TOOL_WRITE || event.isError) return;
-    pendingIntentNudge = null;
-    overlay?.update();
+    // Clear intent nudge once either mutation succeeds (model complied; avoid
+    // injecting a stale completion reminder after todo_update).
+    pi.on("tool_execution_end", async (event) => {
+      if ((event.toolName !== TOOL_WRITE && event.toolName !== TOOL_UPDATE) || event.isError) return;
+      pendingIntentNudge = null;
+      overlay?.update();
   });
 }

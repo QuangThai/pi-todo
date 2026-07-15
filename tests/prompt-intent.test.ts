@@ -110,6 +110,7 @@ describe("reminder builders", () => {
   it("completion reminder lists open items", () => {
     const text = buildCompletionUpdateReminder(["[•] wire overlay", "[ ] write docs"]);
     expect(text).toContain("mark finished items completed");
+    expect(text).toContain("todo_update");
     expect(text).toContain("[•] wire overlay");
   });
 });

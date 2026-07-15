@@ -2,19 +2,20 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { replayFromBranch } from "../src/replay.js";
 import { getTodos, setTodos, __resetStore } from "../src/store.js";
 import { ensureTodoIds, validateTodoWrite } from "../src/validate.js";
-import { TODO_STATE_ENTRY_TYPE, TOOL_WRITE } from "../src/types.js";
+import { TODO_STATE_ENTRY_TYPE, TOOL_UPDATE, TOOL_WRITE } from "../src/types.js";
 
 /**
- * Build a fake branch entry for a todo_write tool result.
+ * Build a fake branch entry for a todo mutation tool result.
  */
 function toolResultEntry(
   todos: Array<{ content: string; status: string; priority: string }>,
+  toolName: string = TOOL_WRITE,
 ) {
   return {
     type: "message",
     message: {
       role: "toolResult",
-      toolName: TOOL_WRITE,
+        toolName,
       details: { todos },
     },
   };
@@ -231,6 +232,21 @@ describe("persistence with custom entries (todowrite's pi.appendEntry)", () => {
     expect(replayFromBranch(branch(entriesRev))).toEqual([
       { content: "Stable", status: "in_progress", priority: "high" },
     ]);
+  });
+
+  it("replays todo_update result when compaction retains messages but prunes custom entries", () => {
+    const beforeUpdate = [
+      { content: "Ship", status: "in_progress", priority: "high" },
+      { content: "Verify", status: "pending", priority: "medium" },
+    ];
+    const afterUpdate = [
+      { content: "Ship", status: "completed", priority: "high" },
+      { content: "Verify", status: "in_progress", priority: "medium" },
+    ];
+    const replayed = replayFromBranch(
+      branch([toolResultEntry(beforeUpdate), toolResultEntry(afterUpdate, TOOL_UPDATE)]),
+    );
+    expect(replayed).toEqual(afterUpdate);
   });
 });
 

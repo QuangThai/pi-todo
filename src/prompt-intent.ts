@@ -140,7 +140,7 @@ export function buildCompletionUpdateReminder(openLines: string[]): string {
       ? `\nOpen todos:\n${openLines.map((l) => `- ${l}`).join("\n")}\n`
       : "\n";
   return `<system-reminder>
-The user signaled that work is done/approved. Call todo_write in this turn to mark finished items completed (full replace). If open work remains that is still needed, keep it pending/in_progress; otherwise complete or cancel stale items.
+The user signaled that work is done/approved. Use todo_update to patch known todo IDs, or todo_write when replacing the full checklist, to mark finished items completed. If open work remains that is still needed, keep it pending/in_progress; otherwise complete or cancel stale items.
 ${body}
 NEVER mention this reminder to the user.
 </system-reminder>`;

@@ -2,29 +2,8 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import type { TodoItem, TodoStatus } from "./types.js";
 import { MAX_OVERLAY_LINES, MAX_RESULT_LINES } from "./types.js";
-import { countOpenTodos, countRunningTodos, hasOpenTodos, isTerminalStatus } from "./validate.js";
+import { countOpenTodos, countRunningTodos, hasOpenTodos } from "./validate.js";
 
-const PRIORITY_RANK: Record<string, number> = {
-  high: 0,
-  medium: 1,
-  low: 2,
-};
-
-function prioritySort(a: TodoItem, b: TodoItem): number {
-  return (PRIORITY_RANK[a.priority] ?? 2) - (PRIORITY_RANK[b.priority] ?? 2);
-}
-
-/** Active work always leads the overlay, then pending, then terminal work. */
-function statusPrioritySort(a: TodoItem, b: TodoItem): number {
-  const statusRank: Record<TodoStatus, number> = {
-    in_progress: 0,
-    pending: 1,
-    completed: 2,
-    cancelled: 2,
-  };
-  const diff = statusRank[a.status] - statusRank[b.status];
-  return diff !== 0 ? diff : prioritySort(a, b);
-}
 
 export function getTodoMarker(status: TodoStatus): string {
   switch (status) {
@@ -47,14 +26,15 @@ export function formatPlainTodoLine(todo: TodoItem): string {
 export function formatTodoListText(todos: readonly TodoItem[], summary: string): string {
   if (todos.length === 0) return summary;
 
-  // in_progress first, then pending (sorted by priority), then terminal
-  const sorted = [...todos].sort(statusPrioritySort);
+  // The list is a workflow timeline. Never reshuffle completed work after the
+  // next task just because its status changed.
+  const ordered = [...todos];
 
   if (todos.length <= MAX_RESULT_LINES) {
-    return [summary, ...sorted.map(formatPlainTodoLine)].join("\n");
+    return [summary, ...ordered.map(formatPlainTodoLine)].join("\n");
   }
-  const shown = sorted.slice(0, MAX_RESULT_LINES);
-  const hidden = sorted.length - MAX_RESULT_LINES;
+  const shown = ordered.slice(0, MAX_RESULT_LINES);
+  const hidden = ordered.length - MAX_RESULT_LINES;
   return [
     summary,
     ...shown.map(formatPlainTodoLine),
@@ -80,14 +60,17 @@ export function shouldShowOverlay(todos: readonly TodoItem[]): boolean {
 
 export interface OverlayLayout {
   visible: TodoItem[];
+  /** Active item repeated below the timeline when it is outside the visible prefix. */
+  pinnedActive?: TodoItem;
   hiddenCount: number;
+  /** Retained for consumers of the layout API; terminal items are no longer regrouped. */
   terminalCount: number;
 }
 
 /**
- * Fit into maxLines (includes heading). On overflow, collapse terminal items
- * into a "+N done" line. Within each status group, items are sorted by
- * priority (high → medium → low).
+ * Fit the checklist timeline into the overlay without sorting by status or
+ * priority. When the active task falls outside the visible prefix, repeat it
+ * as a pinned "Active:" row rather than moving it ahead of earlier work.
  */
 export function selectOverlayLayout(
   todos: readonly TodoItem[],
@@ -99,38 +82,25 @@ export function selectOverlayLayout(
 
   const bodyBudget = Math.max(1, maxLines - 1);
   if (todos.length <= bodyBudget) {
-    // All fit — show everything
-    return { visible: [...todos].sort(statusPrioritySort), hiddenCount: 0, terminalCount: 0 };
+    // All fit — show the canonical checklist sequence unchanged.
+    return { visible: [...todos], hiddenCount: 0, terminalCount: 0 };
   }
 
-  const innerBudget = Math.max(1, bodyBudget - 1);
-  const inProgress = todos.filter((t) => t.status === "in_progress").sort(prioritySort);
-  const pending = todos.filter((t) => t.status === "pending").sort(prioritySort);
-  const terminal = todos.filter((t) => isTerminalStatus(t.status)).sort(prioritySort);
+  const active = todos.find((todo) => todo.status === "in_progress");
+  // Reserve one row for the overflow summary. If the active task lies outside
+  // the timeline prefix, reserve another row to pin it without reordering.
+  let visibleCapacity = Math.max(0, bodyBudget - 1);
+  let visible = todos.slice(0, visibleCapacity);
+  let pinnedActive = active && !visible.includes(active) ? active : undefined;
 
-  const picked: TodoItem[] = [];
-  const addPicked = (items: TodoItem[]) => {
-    for (const t of items) {
-      if (picked.length >= innerBudget) break;
-      picked.push(t);
-    }
-  };
-
-  addPicked(inProgress);
-  addPicked(pending);
-
-  // Collapse terminal items: only show them individually if there's room
-  if (terminal.length > 0 && picked.length < innerBudget) {
-    addPicked(terminal);
+  if (pinnedActive) {
+    visibleCapacity = Math.max(0, bodyBudget - 2);
+    visible = todos.slice(0, visibleCapacity);
+    pinnedActive = active;
   }
 
-  const terminalCollapsed = terminal.length > 0 && picked.length >= innerBudget;
-  const remaining = todos.length - picked.length;
-  const hiddenCount = terminalCollapsed
-    ? remaining - terminal.length
-    : Math.max(0, remaining - terminal.length);
-
-  return { visible: picked, hiddenCount, terminalCount: terminalCollapsed ? terminal.length : 0 };
+  const hiddenCount = todos.length - visible.length - (pinnedActive ? 1 : 0);
+  return { visible, pinnedActive, hiddenCount, terminalCount: 0 };
 }
 
 export interface RenderOverlayOptions {
@@ -152,7 +122,7 @@ export function renderOverlayLines(
 ): string[] {
   if (!shouldShowOverlay(todos)) return [];
 
-  const maxLines = options.maxLines ?? MAX_OVERLAY_LINES;
+  const maxLines = Math.max(1, options.maxLines ?? MAX_OVERLAY_LINES);
   const truncate = (line: string) => truncateToWidth(line, width, "…");
   const open = countOpenTodos(todos);
   const running = countRunningTodos(todos);
@@ -181,12 +151,16 @@ export function renderOverlayLines(
   for (const todo of layout.visible) {
     lines.push(truncate(formatThemedTodoLine(todo, theme)));
   }
-  if (layout.terminalCount > 0) {
-    lines.push(truncate(theme.fg("dim", `+${layout.terminalCount} done`)));
+  if (layout.pinnedActive) {
+    lines.push(
+      truncate(theme.fg("warning", `Active: ${formatPlainTodoLine(layout.pinnedActive)}`)),
+    );
   }
   if (layout.hiddenCount > 0) {
     lines.push(truncate(theme.fg("dim", `+${layout.hiddenCount} more`)));
   }
   lines.push("");
-  return lines;
+  // Layout reserves content rows, but the heading and trailing spacer are
+  // rendered here. Enforce the public maxLines contract at the final boundary.
+  return lines.slice(0, maxLines);
 }

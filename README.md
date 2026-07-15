@@ -6,7 +6,7 @@
 
 OpenCode-style session todo checklist for the [pi coding agent](https://pi.dev).
 
-Adds `todo_write` / `todo_read` / `todo_diagnose`, a live `# Todos` overlay above the editor (`[ ]` / `[•]` / `[✓]` / `[×]`), and branch-replay persistence (survives `/reload`, tree nav, and custom-entry durability across compaction).
+Adds `todo_write` / `todo_update` / `todo_read` / `todo_diagnose`, a live `# Todos` overlay above the editor (`[ ]` / `[•]` / `[✓]` / `[×]`), and branch-replay persistence (survives `/reload`, tree nav, and custom-entry durability across compaction).
 
 ## Install
 
@@ -46,11 +46,24 @@ Rules enforced by the tool:
 - `content` required (non-empty after sanitize); max **500** chars (longer values truncated)
 - `priority` required: `high` | `medium` | `low`
 - Status: `pending` | `in_progress` | `completed` | `cancelled`
+- Array order is the workflow timeline. Keep existing positions when statuses change; only add or reorder items intentionally.
 - Tool text echo caps at **40** lines (`+N more` in the text body; full list still in `details` / JSON)
+
+### `todo_update`
+
+Patch existing todos by stable ID without replacing the list or changing its order. Use `todo_read` first to obtain IDs; this tool never deletes items.
+
+```json
+{
+  "updates": [
+    { "id": "existing-todo-id", "status": "completed" }
+  ]
+}
+```
 
 ### `todo_read`
 
-Returns the current list as text + JSON. Prefer the overlay for at-a-glance status; avoid calling it in the same parallel batch as `todo_write`.
+Returns the current list as text + JSON. Prefer the overlay for at-a-glance status; use it to obtain stable IDs before `todo_update`, and avoid calling it in the same parallel batch as a todo mutation.
 
 ### `todo_diagnose`
 
@@ -68,10 +81,10 @@ Heading shows open + running counts + background-color progress bar, e.g. `# Tod
 - **running** = `in_progress` only (0 or 1 after a valid write)
 - **progress bar** = ANSI background color via reverse video, using theme `accent` (filled) and `muted` (empty)
 
-Items within each status group are sorted by priority (high → medium → low).
-When space is tight, completed/cancelled items collapse into `+N done`.
+Items always stay in the array's workflow order; status changes only their marker/color.
+When space is tight, the overlay shows the earliest checklist items and `+N more`. If the active item is outside that prefix, it is repeated as `Active: [•] …` rather than moved ahead of earlier work.
 A blank line separates the heading from the first todo row for visual breathing room.
-Successful `todo_write` results display `✓ Saved`, meaning the durable checkpoint was accepted before the in-memory snapshot was updated.
+Successful `todo_write` and `todo_update` results display `✓ Saved`, meaning the durable checkpoint was accepted before the in-memory snapshot was updated.
 
 ## Development
 

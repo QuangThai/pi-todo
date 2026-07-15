@@ -147,7 +147,7 @@ describe("validate→store→format integration", () => {
     expect(shouldShowOverlay(getTodos())).toBe(false);
   });
 
-  it("priority sort in overlay matches store", () => {
+  it("overlay preserves checklist sequence", () => {
     setTodos([
       t("Low prior", "pending", "low"),
       t("High prior", "in_progress", "high"),
@@ -155,16 +155,16 @@ describe("validate→store→format integration", () => {
     ]);
 
     const lines = renderOverlayLines(getTodos(), identityTheme, 80);
-    // in_progress first, then sorted by priority
+    // Timeline order is preserved as tasks move through their states.
     const idxInProgress = lines.findIndex((l) => l.includes("High prior"));
     const idxMed = lines.findIndex((l) => l.includes("Med prior"));
     const idxLow = lines.findIndex((l) => l.includes("Low prior"));
-    expect(idxInProgress).toBeGreaterThan(0);
+    expect(idxLow).toBeGreaterThan(0);
+    expect(idxInProgress).toBeGreaterThan(idxLow);
     expect(idxMed).toBeGreaterThan(idxInProgress);
-    expect(idxLow).toBeGreaterThan(idxMed);
   });
 
-  it("collapsible done shows +N when terminal items overflow", () => {
+  it("overflow summary counts terminal items without regrouping the timeline", () => {
     setTodos([
       t("active", "in_progress", "high"),
       t("done1", "completed", "low"),
@@ -174,9 +174,9 @@ describe("validate→store→format integration", () => {
       t("done5", "completed", "low"),
     ]);
 
-    // Tight budget: body=3 → inner=2, many terminal items
     const lines = renderOverlayLines(getTodos(), identityTheme, 80, { maxLines: 4 });
-    expect(lines.some((l) => l.includes("+5 done"))).toBe(true);
+    expect(lines).toContain("[•] active");
+    expect(lines.some((l) => l.includes("+5 more"))).toBe(true);
   });
 });
 

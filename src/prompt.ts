@@ -35,7 +35,8 @@ Do **not** skip just because the request is "explain" or "review" — if the ans
 - Update status in real time; don't batch completions across multiple finished steps.
 - Mark \`completed\` only after the work is actually done (including verification) — never on intent alone.
 - Keep exactly one \`in_progress\` while actively working. Never leave a stale \`in_progress\` after that step is finished.
-- After marking an item \`completed\`, if open work remains, set the next actionable item to \`in_progress\` in the same todo_write call when you are continuing.
+- When using \`todo_write\`, after marking an item \`completed\`, set the next actionable item to \`in_progress\` in the same full-replace call when you are continuing.
+- Array order is the workflow timeline. Preserve existing item positions as statuses change; add or reorder items only deliberately.
 - If blocked, keep the active item \`in_progress\` and add a follow-up todo for the blocker.
 - Items should be specific and actionable.
 - Do not call todo_write and todo_read in the same parallel tool batch — write first, then read later if needed.
@@ -50,8 +51,9 @@ export const TODODIAGNOSE_DESCRIPTION =
 export const TODOWRITE_GUIDELINES = [
   "For multi-step work (3+ steps), codebase explain/explore/review, or when the user gives a list of tasks, call todo_write BEFORE starting — do not skip tracking.",
   "Pass the full list every todo_write call (full replace). Keep exactly one todo in_progress; mark completed immediately when a step finishes — never leave a stale in_progress.",
-  "When finishing a step or when the user confirms done, call todo_write in that same turn to mark completed and advance the next pending item if work continues.",
-    "Do not invent TaskCreate/TaskUpdate tools — use todo_write/todo_read; todo_diagnose is read-only troubleshooting.",
+  "When finishing a step or when the user confirms done, use todo_update for an ID-based patch when possible; use todo_write only when replacing the full checklist. Advance the next pending item in the same mutation if work continues.",
+  "Treat todo array order as the workflow timeline: preserve positions when updating statuses, and only add or reorder items intentionally.",
+  "Use todo_write for full replacement and todo_update for ID-based patches; todo_read exposes IDs and todo_diagnose is read-only troubleshooting.",
   "Do not call todo_write and todo_read in the same parallel tool batch.",
 ];
 
@@ -62,11 +64,11 @@ export const TODOWRITE_GUIDELINES = [
  */
 export const TASK_MANAGEMENT_SECTION = `
 <Task_Management>
-todo_write/todo_read are the coordination layer for multi-step work. The TUI overlay only appears after todo_write — without it the user cannot see plan/progress.
+todo_write/todo_update/todo_read are the coordination layer for multi-step work. Use todo_write for the initial/full checklist and todo_update for a targeted patch by stable ID. The TUI overlay only appears after a todo mutation — without it the user cannot see plan/progress.
 
 Required cold start: for explain/explore/review/implement/refactor/audit/debug/fix/polish/setup of a codebase, feature, UI, or multi-file ask — your FIRST tool call must be todo_write with a short checklist (WHAT/WHERE), exactly one in_progress, then continue. Do not start with read/bash/search alone on those asks.
 
-Ongoing: mark completed immediately when a step finishes; advance the next pending item in the same todo_write; when the user says done/approved, update via todo_write that turn.
+Ongoing: mark completed immediately when a step finishes; use todo_update for a targeted ID-based patch or todo_write for a full replacement. Advance the next pending item in the same mutation; when the user says done/approved, update that turn.
 
 Skip only single trivial Q&A (one short fact, greeting). Multi-step Vietnamese or English asks (giải thích, chỉnh, bổ sung, help me, …) still need todos first.
 </Task_Management>
