@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { sanitizeTodoText } from "../src/sanitize.js";
-import { validateTodoWrite, hasOpenTodos, todosEqual } from "../src/validate.js";
+import { ensureTodoIds, validateTodoWrite, hasOpenTodos, todosEqual } from "../src/validate.js";
 import type { TodoItem } from "../src/types.js";
 
 const sample = (overrides: Partial<TodoItem> = {}): TodoItem => ({
@@ -134,16 +134,36 @@ describe("validateTodoWrite duplicate IDs", () => {
     if (!result.ok) expect(result.error).toMatch(/duplicated/);
   });
 
-  it("allows unique ids across items", () => {
+  it("allows unique ids matching existing items", () => {
+    const current: TodoItem[] = [
+      { id: "aaa", content: "a", status: "pending", priority: "high" },
+      { id: "bbb", content: "b", status: "pending", priority: "low" },
+      { id: "ccc", content: "c", status: "pending", priority: "medium" },
+    ];
     const result = validateTodoWrite(
       [
         { content: "a", status: "pending", priority: "high", id: "aaa" },
         { content: "b", status: "pending", priority: "low", id: "bbb" },
-        { content: "c", status: "pending", priority: "medium", id: "ccc" },
+        { content: "c", status: "in_progress", priority: "medium", id: "ccc" },
       ],
-      [],
+      current,
     );
     expect(result.ok).toBe(true);
+  });
+
+  it("rejects unknown id not in current list", () => {
+    const current: TodoItem[] = [
+      { id: "known-1", content: "existing", status: "pending", priority: "high" },
+    ];
+    const result = validateTodoWrite(
+      [
+        { content: "existing", status: "pending", priority: "high", id: "known-1" },
+        { content: "new task", status: "pending", priority: "low", id: "spoof" },
+      ],
+      current,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/does not match any existing todo/);
   });
 
   it("allows items without ids (auto-assign)", () => {
@@ -155,5 +175,58 @@ describe("validateTodoWrite duplicate IDs", () => {
       [],
     );
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("ensureTodoIds", () => {
+  it("preserves ID when incoming item has explicit id", () => {
+    const result = ensureTodoIds(
+      [{ content: "a", status: "pending", priority: "high", id: "keep" }],
+      [{ content: "a", status: "pending", priority: "high", id: "keep" }],
+    );
+    expect(result[0].id).toBe("keep");
+    expect(result).toHaveLength(1);
+  });
+
+  it("matches by full tuple (content+status+priority) when no id", () => {
+    const current = [
+      { id: "a1", content: "Task", status: "pending" as const, priority: "high" as const },
+      { id: "a2", content: "Task", status: "in_progress" as const, priority: "low" as const },
+    ];
+    const incoming = [
+      { content: "Task", status: "in_progress" as const, priority: "low" as const },
+      { content: "Task", status: "pending" as const, priority: "high" as const },
+    ];
+    const result = ensureTodoIds(incoming, current);
+    // Reordered but should match by tuple, not index
+    expect(result[0].id).toBe("a2");   // in_progress/low → "a2"
+    expect(result[1].id).toBe("a1");   // pending/high → "a1"
+  });
+
+  it("generates fresh IDs for duplicate content items (ambiguous)", () => {
+    const current = [
+      { id: "a1", content: "Same", status: "pending" as const, priority: "high" as const },
+      { id: "a2", content: "Same", status: "pending" as const, priority: "high" as const },
+    ];
+    const incoming = [
+      { content: "Same", status: "completed" as const, priority: "high" as const },  // tuple doesn't match
+    ];
+    const result = ensureTodoIds(incoming, current);
+    // Content is not unique in current → should get fresh UUID, not borrow
+    expect(result[0].id).not.toBe("a1");
+    expect(result[0].id).not.toBe("a2");
+  });
+
+  it("content-only fallback only when content is unique in current", () => {
+    const current = [
+      { id: "uniq", content: "Unique task", status: "pending" as const, priority: "medium" as const },
+      { id: "other", content: "Other", status: "completed" as const, priority: "low" as const },
+    ];
+    const incoming = [
+      { content: "Unique task", status: "completed" as const, priority: "medium" as const },  // status changed
+    ];
+    const result = ensureTodoIds(incoming, current);
+    // Tuple doesn't match (different status) but content is unique → fallback borrows "uniq"
+    expect(result[0].id).toBe("uniq");
   });
 });

@@ -91,19 +91,63 @@ export function validateTodoWrite(
     };
   }
 
+  // Reject explicit IDs that don't exist in current list
+  // (caller must omit `id` for new items so the system auto-assigns).
+  const currentIds = new Set(current.map((t) => t.id).filter(Boolean));
+  for (let i = 0; i < todos.length; i++) {
+    if (todos[i].id && !currentIds.has(todos[i].id)) {
+      return {
+        ok: false,
+        error: `todos[${i}].id "${todos[i].id}" does not match any existing todo; omit id for new items`,
+      };
+    }
+  }
+
   return { ok: true, todos, unchanged: todosEqual(todos, current) };
 }
 
-/** Assign IDs once at mutation time; preserves caller/current IDs for compatibility with legacy sessions. */
+/** Assign IDs once at mutation time.
+ *
+ * - Items with an explicit `id` keep it (must already exist in `current`, verified
+ *   by `validateTodoWrite`).
+ * - Items without `id` try to match a prior item: first by full tuple
+ *   (content+status+priority), then by unique content.  If ambiguous (multiple
+ *   same-content items) or no prior match, a new UUID is generated.
+ */
 export function ensureTodoIds(todos: readonly TodoItem[], current: readonly TodoItem[]): TodoItem[] {
   const claimed = new Set<string>();
+
+  // Pre-index content uniqueness: content that appears only once in `current`
+  // is safe for content-only fallback.
+  const contentCounts = new Map<string, number>();
+  for (const c of current) {
+    contentCounts.set(c.content, (contentCounts.get(c.content) ?? 0) + 1);
+  }
+
   return todos.map((todo) => {
     let id = todo.id;
     if (!id) {
-      const prior = current.find((candidate) =>
-        !!candidate.id && !claimed.has(candidate.id) && candidate.content === todo.content,
+      // 1. Exact tuple match (content + status + priority)
+      const byTuple = current.find(
+        (c) => !!c.id && !claimed.has(c.id) &&
+          c.content === todo.content &&
+          c.status === todo.status &&
+          c.priority === todo.priority,
       );
-      id = prior?.id ?? randomUUID();
+      if (byTuple) {
+        id = byTuple.id;
+      } else {
+        // 2. Content-only fallback — only when content is unique in current
+        const count = contentCounts.get(todo.content) ?? 0;
+        if (count === 1) {
+          const byContent = current.find(
+            (c) => !!c.id && !claimed.has(c.id) && c.content === todo.content,
+          );
+          if (byContent) id = byContent.id;
+        }
+      }
+      // 3. No match or ambiguous → fresh ID
+      if (!id) id = randomUUID();
     }
     claimed.add(id);
     return { ...todo, id };
