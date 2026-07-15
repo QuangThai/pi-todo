@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 (2026-07-15)
+
+- Add gallery screenshot to pi manifest for pi.dev/packages listing.
+
 ## 0.2.1 (2026-07-15)
 
 - Overlay heading spacing: add blank line + `maxLines-1` budget for clean visual separation.
