@@ -158,8 +158,7 @@ export function renderOverlayLines(
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   const barWidth = Math.max(4, Math.min(12, Math.floor(width / 8)));
   const filled = Math.round((barWidth * done) / total);
-  const bar =
-    "█".repeat(filled) + "░".repeat(Math.max(0, barWidth - filled));
+  const bar = "#".repeat(filled) + "·".repeat(Math.max(0, barWidth - filled));
 
   const heading = truncate(
     theme.fg("accent", theme.bold(`# Todos`)) +

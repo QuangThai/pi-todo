@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.5 (2026-07-15)
+
+- Fix progress bar: use single-width ASCII (`#`/`·`) instead of double-width Unicode (`█`/`░`) to avoid alignment issues in terminal.
+- README: update progress bar example to match ASCII chars.
+
 ## 0.2.4 (2026-07-15)
 
 - README: add npm/CI/license badges.

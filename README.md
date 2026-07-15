@@ -58,11 +58,11 @@ Shown above the editor while any **open** todo remains (`pending` / `in_progress
 
 Hidden when the list is empty or every item is `completed` / `cancelled`.
 
-Heading shows open + running counts + progress bar, e.g. `# Todos (2 open, 1 running) ████░░░░ 60%`:
+Heading shows open + running counts + progress bar, e.g. `# Todos (3 open, 1 running) ####···· 25%`:
 
 - **open** = `pending` + `in_progress`
 - **running** = `in_progress` only (0 or 1 after a valid write)
-- **progress bar** = completed / total (adaptive width)
+- **progress bar** = completed / total (adaptive width, single-width ASCII)
 
 Items within each status group are sorted by priority (high → medium → low).
 When space is tight, completed/cancelled items collapse into `+N done`.
