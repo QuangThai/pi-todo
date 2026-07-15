@@ -158,14 +158,15 @@ describe("renderOverlayLines", () => {
     expect(lines[0]).toContain("(2 open, 1 running)");
   });
 
-  it("heading is immediately followed by first todo row (no gap)", () => {
+  it("has a minimal blank-line gap between heading and first todo row", () => {
     const lines = renderOverlayLines(
       [t("a", "completed"), t("b", "in_progress"), t("c", "pending")],
       identityTheme,
       80,
     );
     expect(lines[0]).toContain("# Todos");
-    expect(lines[1]).toMatch(/^\[/);
+    expect(lines[1]).toBe("");
+    expect(lines[2]).toMatch(/^\[/);
   });
 
   it("shows 0 running when none in_progress", () => {

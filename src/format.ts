@@ -124,8 +124,9 @@ export function renderOverlayLines(
       theme.fg("dim", ` (${open} open, ${running} running)`),
   );
 
-  const layout = selectOverlayLayout(todos, maxLines);
-  const lines: string[] = [heading];
+  // Small gap between heading and first row — budget -1 to account for the blank line
+  const layout = selectOverlayLayout(todos, Math.max(3, maxLines - 1));
+  const lines: string[] = [heading, ""];
 
   for (const todo of layout.visible) {
     lines.push(truncate(formatThemedTodoLine(todo, theme)));
