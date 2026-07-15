@@ -4,17 +4,9 @@ OpenCode-style session todo checklist for the [pi coding agent](https://pi.dev).
 
 Adds `todowrite` / `todoread`, a live `# Todos` overlay above the editor (`[ ]` / `[•]` / `[✓]` / `[×]`), and branch-replay persistence (survives `/reload`, tree nav, and custom-entry durability across compaction).
 
-**Repo:** [github.com/QuangThai/pi-todo](https://github.com/QuangThai/pi-todo)
-
 ## Install
 
-**Important:** uninstall any competing task extension first (especially `@tintinweb/pi-tasks`) to avoid dual task systems:
-
-```bash
-pi remove npm:@tintinweb/pi-tasks
-```
-
-Install from GitHub:
+From GitHub:
 
 ```bash
 pi install git:github.com/QuangThai/pi-todo
@@ -72,30 +64,6 @@ Heading shows open + running counts, e.g. `# Todos (2 open, 1 running)`:
 - **running** = `in_progress` only (0 or 1 after a valid write)
 
 There is a blank line under the heading so it is not flush against the first todo row.
-
-## Model guidance
-
-Overlay **never** auto-updates from chat. Status changes only when the model calls `todowrite`.
-
-| Layer | Purpose | Source |
-|-------|---------|--------|
-| `before_agent_start` `<Task_Management>` | Baseline every agent run | pi-todotools |
-| **Prompt-aware cold start** | Multi-step ask (EN/VI: explain, fix, polish, help me, lists, long asks…) **and** empty list → system boost + one-shot `<system-reminder>` | hybrid |
-| **Prompt-aware completion** | If user says done/approved **and** open work remains → one-shot update reminder | hybrid |
-| Tool description + `promptGuidelines` | Detailed when/how + complete-as-you-go | OpenCode / rpiv |
-| Idle `<system-reminder>` via `context` | After ~4 turns without todo tools **while open work remains** | pi-tasks cadence |
-| State-aware reminder body | Lists open items; if one is `in_progress`, nudges mark `completed` + advance next | edxeth/meh pi-tasks |
-
-Cold-start heuristics cover many prompts beyond “explain codebase”: implement/fix/polish/setup, Vietnamese (giải thích, chỉnh, bổ sung…), help-me phrasing, numbered lists, multi-sentence, and longer substantive asks. Skip remains for greetings and short factoids.
-
-Not implemented (intentionally): inventing todo items from chat without a model `todowrite`; agent_settled auto-continuation (removed upstream in pi-todotools).
-
-**After `/reload`:** multi-step asks should get a cold-start reminder on the first LLM turn. If a model still skips, say “create todos first” once — that is a model compliance limit, not a missing overlay bug.
-
-## Compatibility
-
-- Do **not** run alongside `@tintinweb/pi-tasks` (overlapping task UX / reminders).
-- Designed as a lighter OpenCode-style checklist (no DAG / TaskExecute).
 
 ## Development
 
