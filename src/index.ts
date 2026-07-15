@@ -33,10 +33,11 @@ import { clearTodos, getTodos, setTodos } from "./store.js";
 import { registerTodoReadTool } from "./tools/todoread.js";
 import { registerTodoDiagnoseTool } from "./tools/tododiagnose.js";
 import { registerTodoWriteTool } from "./tools/todowrite.js";
-import { TOOL_DIAGNOSE, TOOL_READ, TOOL_WRITE } from "./types.js";
+import { registerTodoUpdateTool } from "./tools/todoupdate.js";
+import { TOOL_DIAGNOSE, TOOL_READ, TOOL_UPDATE, TOOL_WRITE } from "./types.js";
 import { hasOpenTodos, isOpenTodo } from "./validate.js";
 
-const TODO_TOOL_NAMES = new Set([TOOL_WRITE, TOOL_READ, TOOL_DIAGNOSE]);
+const TODO_TOOL_NAMES = new Set([TOOL_WRITE, TOOL_READ, TOOL_UPDATE, TOOL_DIAGNOSE]);
 
 const cadenceConfig: CadenceConfig = {
   reminderInterval: REMINDER_INTERVAL,
@@ -87,6 +88,7 @@ export default function (pi: ExtensionAPI): void {
   };
 
   registerTodoWriteTool(pi, { onCommit: refreshOverlay });
+  registerTodoUpdateTool(pi, { onCommit: refreshOverlay });
   registerTodoReadTool(pi);
   registerTodoDiagnoseTool(pi);
 

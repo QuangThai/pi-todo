@@ -1,4 +1,5 @@
 import { sanitizeTodoText } from "./sanitize.js";
+import { randomUUID } from "node:crypto";
 import type { TodoItem, TodoPriority, TodoStatus } from "./types.js";
 import { MAX_CONTENT_LENGTH, TODO_PRIORITIES, TODO_STATUSES } from "./types.js";
 
@@ -18,7 +19,7 @@ export function todosEqual(a: readonly TodoItem[], b: readonly TodoItem[]): bool
   if (a.length !== b.length) return false;
   return a.every(
     (item, i) =>
-      item.content === b[i].content && item.status === b[i].status && item.priority === b[i].priority,
+        item.id === b[i].id && item.content === b[i].content && item.status === b[i].status && item.priority === b[i].priority,
   );
 }
 
@@ -36,6 +37,7 @@ export function validateTodoWrite(
 
   const todos: TodoItem[] = [];
   let inProgressCount = 0;
+  const seenIds = new Set<string>();
 
   for (let i = 0; i < rawTodos.length; i++) {
     const item = rawTodos[i];
@@ -70,7 +72,16 @@ export function validateTodoWrite(
 
     if (rec.status === "in_progress") inProgressCount += 1;
 
-    todos.push({ content, status: rec.status, priority: rec.priority });
+    if (rec.id !== undefined) {
+      if (typeof rec.id !== "string" || !rec.id.trim()) {
+        return { ok: false, error: `todos[${i}].id must be a non-empty string when provided` };
+      }
+      if (seenIds.has(rec.id)) {
+        return { ok: false, error: `todos[${i}].id "${rec.id}" is duplicated` };
+      }
+      seenIds.add(rec.id);
+    }
+    todos.push({ ...(typeof rec.id === "string" ? { id: rec.id } : {}), content, status: rec.status, priority: rec.priority });
   }
 
   if (inProgressCount > 1) {
@@ -81,6 +92,47 @@ export function validateTodoWrite(
   }
 
   return { ok: true, todos, unchanged: todosEqual(todos, current) };
+}
+
+/** Assign IDs once at mutation time; preserves caller/current IDs for compatibility with legacy sessions. */
+export function ensureTodoIds(todos: readonly TodoItem[], current: readonly TodoItem[]): TodoItem[] {
+  const claimed = new Set<string>();
+  return todos.map((todo) => {
+    let id = todo.id;
+    if (!id) {
+      const prior = current.find((candidate) =>
+        !!candidate.id && !claimed.has(candidate.id) && candidate.content === todo.content,
+      );
+      id = prior?.id ?? randomUUID();
+    }
+    claimed.add(id);
+    return { ...todo, id };
+  });
+}
+
+export function validateTodoUpdate(rawUpdates: unknown, current: readonly TodoItem[]): ValidateResult {
+  if (!Array.isArray(rawUpdates) || rawUpdates.length === 0) {
+    return { ok: false, error: "updates must be a non-empty array" };
+  }
+  const next = current.map((todo) => ({ ...todo }));
+  const seen = new Set<string>();
+  for (let i = 0; i < rawUpdates.length; i++) {
+    const update = rawUpdates[i];
+    if (!update || typeof update !== "object") return { ok: false, error: `updates[${i}] must be an object` };
+    const rec = update as Record<string, unknown>;
+    if (typeof rec.id !== "string" || !rec.id) return { ok: false, error: `updates[${i}].id must be a non-empty string` };
+    if (seen.has(rec.id)) return { ok: false, error: `updates[${i}].id is duplicated` };
+    seen.add(rec.id);
+    const target = next.find((todo) => todo.id === rec.id);
+    if (!target) return { ok: false, error: `updates[${i}].id does not match an existing todo` };
+    if (rec.content === undefined && rec.status === undefined && rec.priority === undefined) {
+      return { ok: false, error: `updates[${i}] must change content, status, or priority` };
+    }
+    if (rec.content !== undefined) target.content = rec.content as string;
+    if (rec.status !== undefined) target.status = rec.status as TodoStatus;
+    if (rec.priority !== undefined) target.priority = rec.priority as TodoPriority;
+  }
+  return validateTodoWrite(next, current);
 }
 
 export function isTerminalStatus(status: TodoStatus): boolean {

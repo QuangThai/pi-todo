@@ -6,7 +6,7 @@ import { TodoWriteParams } from "../schema.js";
 import { getTodos, setTodos, withStoreLock } from "../store.js";
 import type { TodoWriteDetails } from "../types.js";
 import { TODO_STATE_ENTRY_TYPE, TOOL_WRITE } from "../types.js";
-import { countOpenTodos, validateTodoWrite } from "../validate.js";
+import { countOpenTodos, ensureTodoIds, todosEqual, validateTodoWrite } from "../validate.js";
 
 export function registerTodoWriteTool(
   pi: ExtensionAPI,
@@ -33,12 +33,14 @@ export function registerTodoWriteTool(
           };
         }
 
-        // 1. Persist durable state BEFORE updating in-memory store.
+          const todos = result.unchanged ? result.todos : ensureTodoIds(result.todos, current);
+          const unchanged = result.unchanged || todosEqual(todos, current);
+          // 1. Persist durable state BEFORE updating in-memory store.
         //    If appendEntry fails (stale ctx, persistence error), we abort
         //    so in-memory store never diverges from durable state.
-        if (!result.unchanged) {
+          if (!unchanged) {
           try {
-            pi.appendEntry(TODO_STATE_ENTRY_TYPE, { todos: result.todos });
+              pi.appendEntry(TODO_STATE_ENTRY_TYPE, { todos });
           } catch (e) {
             // Stale session: discard this write entirely — returning error
             // so the LLM knows the state was not committed.
@@ -59,20 +61,20 @@ export function registerTodoWriteTool(
         }
 
         // 2. Durable write succeeded (or no-op) — now update in-memory store.
-        setTodos(result.todos);
+          setTodos(todos);
 
         options.onCommit?.();
 
-        const open = countOpenTodos(result.todos);
-        const summary = result.unchanged
+          const open = countOpenTodos(todos);
+          const summary = unchanged
           ? "No change"
-          : `${open} open / ${result.todos.length} total`;
+            : `${open} open / ${todos.length} total`;
         const body =
-          result.todos.length === 0 ? "Cleared todos" : formatTodoListText(result.todos, summary);
+            todos.length === 0 ? "Cleared todos" : formatTodoListText(todos, summary);
 
         const details: TodoWriteDetails = {
-          todos: result.todos,
-          ...(result.unchanged ? { unchanged: true } : {}),
+            todos,
+            ...(unchanged ? { unchanged: true } : {}),
         };
 
         return {

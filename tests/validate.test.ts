@@ -107,3 +107,53 @@ describe("hasOpenTodos / todosEqual", () => {
     expect(todosEqual([sample()], [sample({ priority: "high" })])).toBe(false);
   });
 });
+
+describe("validateTodoWrite duplicate IDs", () => {
+  it("rejects two items with same id", () => {
+    const result = validateTodoWrite(
+      [
+        { content: "a", status: "pending", priority: "high", id: "dup" },
+        { content: "b", status: "pending", priority: "low", id: "dup" },
+      ],
+      [],
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/duplicated/);
+  });
+
+  it("rejects three items with same id", () => {
+    const result = validateTodoWrite(
+      [
+        { content: "a", status: "pending", priority: "high", id: "x" },
+        { content: "b", status: "pending", priority: "low", id: "x" },
+        { content: "c", status: "in_progress", priority: "medium", id: "x" },
+      ],
+      [],
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/duplicated/);
+  });
+
+  it("allows unique ids across items", () => {
+    const result = validateTodoWrite(
+      [
+        { content: "a", status: "pending", priority: "high", id: "aaa" },
+        { content: "b", status: "pending", priority: "low", id: "bbb" },
+        { content: "c", status: "pending", priority: "medium", id: "ccc" },
+      ],
+      [],
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it("allows items without ids (auto-assign)", () => {
+    const result = validateTodoWrite(
+      [
+        { content: "a", status: "pending", priority: "high" },
+        { content: "b", status: "pending", priority: "low" },
+      ],
+      [],
+    );
+    expect(result.ok).toBe(true);
+  });
+});
