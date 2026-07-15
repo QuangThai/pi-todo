@@ -4,19 +4,30 @@ OpenCode-style session todo checklist for the [pi coding agent](https://pi.dev).
 
 Adds `todowrite` / `todoread`, a live `# Todos` overlay above the editor (`[ ]` / `[•]` / `[✓]` / `[×]`), and branch-replay persistence (survives `/reload`, tree nav, and custom-entry durability across compaction).
 
+**Repo:** [github.com/QuangThai/pi-todo](https://github.com/QuangThai/pi-todo)
+
 ## Install
 
 **Important:** uninstall any competing task extension first (especially `@tintinweb/pi-tasks`) to avoid dual task systems:
 
 ```bash
 pi remove npm:@tintinweb/pi-tasks
-pi install /absolute/path/to/pi-todo
 ```
 
-Or from this repo:
+Install from GitHub:
 
 ```bash
-pi install D:/Personal/pi-todo
+pi install git:github.com/QuangThai/pi-todo
+# or
+pi install https://github.com/QuangThai/pi-todo
+```
+
+Local path (development):
+
+```bash
+pi install /absolute/path/to/pi-todo
+# or without installing:
+pi -e ./src/index.ts
 ```
 
 Then restart pi or run `/reload`.
@@ -56,6 +67,7 @@ Shown above the editor while any **open** todo remains (`pending` / `in_progress
 Hidden when the list is empty or every item is `completed` / `cancelled`.
 
 Heading shows open + running counts, e.g. `# Todos (2 open, 1 running)`:
+
 - **open** = `pending` + `in_progress`
 - **running** = `in_progress` only (0 or 1 after a valid write)
 
@@ -80,9 +92,16 @@ Not implemented (intentionally): inventing todo items from chat without a model 
 
 **After `/reload`:** multi-step asks should get a cold-start reminder on the first LLM turn. If a model still skips, say “create todos first” once — that is a model compliance limit, not a missing overlay bug.
 
+## Compatibility
+
+- Do **not** run alongside `@tintinweb/pi-tasks` (overlapping task UX / reminders).
+- Designed as a lighter OpenCode-style checklist (no DAG / TaskExecute).
+
 ## Development
 
 ```bash
+git clone https://github.com/QuangThai/pi-todo.git
+cd pi-todo
 npm install
 npm test
 npm run typecheck
@@ -91,4 +110,4 @@ pi -e ./src/index.ts
 
 ## License
 
-MIT
+[MIT](./LICENSE) © QuangThai

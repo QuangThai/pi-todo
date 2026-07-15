@@ -1,10 +1,34 @@
 {
   "name": "pi-todo",
   "version": "0.1.0",
-  "description": "OpenCode-like session todo checklist for the pi coding agent",
+  "description": "OpenCode-like session todo checklist for the pi coding agent — todowrite/todoread with a live TUI overlay",
   "type": "module",
-  "keywords": ["pi-package", "pi", "todo", "opencode"],
+  "author": "QuangThai",
   "license": "MIT",
+  "homepage": "https://github.com/QuangThai/pi-todo#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/QuangThai/pi-todo.git"
+  },
+  "bugs": {
+    "url": "https://github.com/QuangThai/pi-todo/issues"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "pi-coding-agent",
+    "todo",
+    "todowrite",
+    "todoread",
+    "opencode",
+    "tui"
+  ],
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
