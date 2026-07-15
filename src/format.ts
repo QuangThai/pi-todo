@@ -124,9 +124,8 @@ export function renderOverlayLines(
       theme.fg("dim", ` (${open} open, ${running} running)`),
   );
 
-  // Reserve heading + blank gap under heading so the title isn't flush with rows.
-  const layout = selectOverlayLayout(todos, Math.max(3, maxLines - 1));
-  const lines: string[] = [heading, ""];
+  const layout = selectOverlayLayout(todos, maxLines);
+  const lines: string[] = [heading];
 
   for (const todo of layout.visible) {
     lines.push(truncate(formatThemedTodoLine(todo, theme)));

@@ -59,7 +59,7 @@ Heading shows open + running counts, e.g. `# Todos (2 open, 1 running)`:
 - **open** = `pending` + `in_progress`
 - **running** = `in_progress` only (0 or 1 after a valid write)
 
-There is a blank line under the heading so it is not flush against the first todo row.
+Heading sits directly above the first todo row.
 
 ## Development
 
