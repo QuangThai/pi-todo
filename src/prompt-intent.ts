@@ -6,7 +6,7 @@
  * - Idle reminders only fire when open work already exists — so cold start
  *   needs a separate, prompt-aware path.
  * - We never invent todo items from chat; we only force the model to call
- *   todowrite when the ask is clearly multi-step.
+ *   todo_write when the ask is clearly multi-step.
  *
  * Bias: prefer multi_step for substantive asks; keep trivial very narrow.
  */
@@ -111,7 +111,7 @@ export function classifyPrompt(prompt: string): PromptIntent {
   return { kind: "unknown", reason: "no_strong_signal" };
 }
 
-/** True when we should force a cold-start todowrite nudge. */
+/** True when we should force a cold-start todo_write nudge. */
 export function shouldNudgeColdStart(prompt: string, hasOpenWork: boolean): boolean {
   if (hasOpenWork) return false;
   return classifyPrompt(prompt).kind === "multi_step";
@@ -126,7 +126,7 @@ export function shouldNudgeCompletionUpdate(prompt: string, hasOpenWork: boolean
 export function buildColdStartReminder(prompt: string): string {
   const clipped = prompt.trim().replace(/\s+/g, " ").slice(0, 160);
   return `<system-reminder>
-This user request is multi-step. Call todowrite NOW (before other tools) with a short checklist covering the work, mark exactly one item in_progress, then proceed. The overlay only appears after todowrite.
+This user request is multi-step. Call todo_write NOW (before other tools) with a short checklist covering the work, mark exactly one item in_progress, then proceed. The overlay only appears after todo_write.
 
 User ask (clipped): "${clipped}"
 
@@ -140,7 +140,7 @@ export function buildCompletionUpdateReminder(openLines: string[]): string {
       ? `\nOpen todos:\n${openLines.map((l) => `- ${l}`).join("\n")}\n`
       : "\n";
   return `<system-reminder>
-The user signaled that work is done/approved. Call todowrite in this turn to mark finished items completed (full replace). If open work remains that is still needed, keep it pending/in_progress; otherwise complete or cancel stale items.
+The user signaled that work is done/approved. Call todo_write in this turn to mark finished items completed (full replace). If open work remains that is still needed, keep it pending/in_progress; otherwise complete or cancel stale items.
 ${body}
 NEVER mention this reminder to the user.
 </system-reminder>`;

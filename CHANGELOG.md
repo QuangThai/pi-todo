@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.3 (2026-07-15)
+
+- Rename tools to snake_case: `todowrite` → `todo_write`, `todoread` → `todo_read` (pi convention).
+- Improve renderCall/renderResult: accent color for item count, "X open / Y total" instead of "N todo(s)".
+- Update all prompt references to match new tool names.
+
 ## 0.2.2 (2026-07-15)
 
 - Add gallery screenshot to pi manifest for pi.dev/packages listing.

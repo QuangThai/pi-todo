@@ -69,7 +69,7 @@ export function registerTodoWriteTool(
     renderCall(args, theme) {
       const n = Array.isArray(args.todos) ? args.todos.length : 0;
       return new Text(
-        theme.fg("toolTitle", theme.bold("todowrite ")) + theme.fg("muted", `${n} item(s)`),
+        theme.fg("toolTitle", theme.bold("todo_write ")) + theme.fg("accent", `${n} item(s)`),
         0,
         0,
       );
@@ -84,6 +84,11 @@ export function registerTodoWriteTool(
         return new Text(theme.fg("dim", "No change"), 0, 0);
       }
       const text = result.content[0];
+      if (!details?.error && !details?.unchanged) {
+        const open = details?.todos ? details.todos.filter((t: any) => t.status === "pending" || t.status === "in_progress").length : 0;
+        const total = details?.todos?.length ?? 0;
+        return new Text(theme.fg("success", "✓ ") + theme.fg("muted", `${open} open / ${total} total`), 0, 0);
+      }
       const msg = text?.type === "text" ? text.text.split("\n")[0] ?? "Updated" : "Updated";
       return new Text(theme.fg("success", "✓ ") + theme.fg("muted", msg), 0, 0);
     },

@@ -11,7 +11,7 @@ import type { TodoItem } from "../src/types.js";
 
 const config: CadenceConfig = {
   reminderInterval: 4,
-  todoToolNames: new Set(["todowrite", "todoread"]),
+  todoToolNames: new Set(["todo_write", "todo_read"]),
 };
 
 const t = (
@@ -46,13 +46,13 @@ describe("reminder cadence", () => {
     expect(state.reminderDue).toBe(false);
   });
 
-  it("resets cadence on todowrite", () => {
+  it("resets cadence on todo_write", () => {
     const state = createCadenceState();
     for (let i = 0; i < 5; i++) onTurnStart(state);
     evaluateToolResult(state, "bash", true, config);
     expect(state.reminderDue).toBe(true);
 
-    evaluateToolResult(state, "todowrite", true, config);
+    evaluateToolResult(state, "todo_write", true, config);
     expect(state.reminderDue).toBe(false);
     expect(drainReminderForContext(state)).toBe(false);
   });

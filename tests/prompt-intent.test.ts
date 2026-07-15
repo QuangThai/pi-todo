@@ -100,9 +100,9 @@ describe("shouldNudgeCompletionUpdate", () => {
 });
 
 describe("reminder builders", () => {
-  it("cold-start reminder demands todowrite first", () => {
+  it("cold-start reminder demands todo_write first", () => {
     const text = buildColdStartReminder("explain this codebase for todo tasks");
-    expect(text).toContain("Call todowrite NOW");
+    expect(text).toContain("Call todo_write NOW");
     expect(text).toContain("explain this codebase");
     expect(text).toContain("NEVER mention this reminder");
   });

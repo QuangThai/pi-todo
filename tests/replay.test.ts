@@ -15,7 +15,7 @@ describe("replayFromBranch", () => {
     expect(replayFromBranch(branch([]))).toEqual([]);
   });
 
-  it("takes last todowrite details", () => {
+  it("takes last todo_write details", () => {
     const entries = [
       {
         type: "message",

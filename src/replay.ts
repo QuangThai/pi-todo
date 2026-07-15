@@ -35,7 +35,7 @@ function isWriteDetails(value: unknown): value is TodoWriteDetails {
 /**
  * Last-write-wins over the current branch:
  * - custom `pi-todo.state` entries
- * - `todowrite` toolResult details
+ * - `todo_write` toolResult details
  */
 export function replayFromBranch(ctx: {
   sessionManager: { getBranch(): Iterable<unknown> };

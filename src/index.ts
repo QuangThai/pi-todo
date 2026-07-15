@@ -1,7 +1,7 @@
 /**
  * pi-todo — OpenCode-like session todo checklist for Pi.
  *
- * Tools: todowrite (full replace), todoread
+ * Tools: todo_write (full replace), todo_read
  * Overlay: # Todos with [ ]/[•]/[✓]/[×] above the editor
  * Persistence: toolResult details + custom entry, replayed from branch
  * Reminder: pi-tasks-style cadence → transient <system-reminder> via context
@@ -176,7 +176,7 @@ export default function (pi: ExtensionAPI): void {
   });
 
   // Refresh from in-memory store — do NOT replayFromBranch here (branch is stale).
-  // Clear intent nudge once todowrite succeeds (model complied; avoid double-inject).
+  // Clear intent nudge once todo_write succeeds (model complied; avoid double-inject).
   pi.on("tool_execution_end", async (event) => {
     if (event.toolName !== TOOL_WRITE || event.isError) return;
     pendingIntentNudge = null;

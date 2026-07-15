@@ -37,13 +37,18 @@ export function registerTodoReadTool(pi: ExtensionAPI): void {
     },
 
     renderCall(_args, theme) {
-      return new Text(theme.fg("toolTitle", theme.bold("todoread")), 0, 0);
+      return new Text(theme.fg("toolTitle", theme.bold("todo_read")), 0, 0);
     },
 
     renderResult(result, _opts, theme) {
       const details = result.details as { todos?: unknown[] } | undefined;
-      const n = Array.isArray(details?.todos) ? details.todos.length : 0;
-      return new Text(theme.fg("muted", `${n} todo(s)`), 0, 0);
+      const todos = details?.todos;
+      if (!Array.isArray(todos) || todos.length === 0) {
+        return new Text(theme.fg("dim", "0 items"), 0, 0);
+      }
+      const total = todos.length;
+      const open = Array.isArray(todos) ? todos.filter((t: any) => t.status === "pending" || t.status === "in_progress").length : 0;
+      return new Text(theme.fg("muted", `${open} open / ${total} total`), 0, 0);
     },
   });
 }
