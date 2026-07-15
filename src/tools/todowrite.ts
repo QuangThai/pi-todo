@@ -33,24 +33,33 @@ export function registerTodoWriteTool(
           };
         }
 
-        setTodos(result.todos);
-
-        // Durable custom entry (not sent to LLM) — survives compaction better than tool details alone.
-        // Skip no-op rewrites to avoid session noise.
+        // 1. Persist durable state BEFORE updating in-memory store.
+        //    If appendEntry fails (stale ctx, persistence error), we abort
+        //    so in-memory store never diverges from durable state.
         if (!result.unchanged) {
           try {
             pi.appendEntry(TODO_STATE_ENTRY_TYPE, { todos: result.todos });
           } catch (e) {
-            // Only swallow host-reject errors (stale context, unsupported custom entry).
-            // Let real runtime/disk/persistence errors propagate so they surface to the user.
+            // Stale session: discard this write entirely — returning error
+            // so the LLM knows the state was not committed.
             if (/stale after session replacement/i.test(String(e))) {
-              // Expected: session was replaced, this append is discarded.
-              // toolResult details still provide branch replay.
-            } else {
-              throw e;
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: "Error: session was replaced — state not committed. Please retry todo_write.",
+                  },
+                ],
+                details: { todos: current, error: "stale session replacement" } satisfies TodoWriteDetails,
+              };
             }
+            // Real persistence/disk/runtime error: propagate.
+            throw e;
           }
         }
+
+        // 2. Durable write succeeded (or no-op) — now update in-memory store.
+        setTodos(result.todos);
 
         options.onCommit?.();
 
@@ -94,7 +103,11 @@ export function registerTodoWriteTool(
       if (!details?.error && !details?.unchanged) {
         const open = details?.todos ? details.todos.filter((t: any) => t.status === "pending" || t.status === "in_progress").length : 0;
         const total = details?.todos?.length ?? 0;
-        return new Text(theme.fg("success", "✓ ") + theme.fg("muted", `${open} open / ${total} total`), 0, 0);
+          return new Text(
+            theme.fg("success", "✓ Saved") + theme.fg("muted", ` · ${open} open / ${total} total`),
+            0,
+            0,
+          );
       }
       const msg = text?.type === "text" ? text.text.split("\n")[0] ?? "Updated" : "Updated";
       return new Text(theme.fg("success", "✓ ") + theme.fg("muted", msg), 0, 0);

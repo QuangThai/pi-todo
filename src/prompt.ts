@@ -44,11 +44,14 @@ Do **not** skip just because the request is "explain" or "review" — if the ans
 export const TODOREAD_DESCRIPTION =
   "Read the current session todo list. Returns JSON of all todos with status and priority. Prefer the overlay for at-a-glance status; call after todo_write settles (not in the same parallel batch).";
 
+export const TODODIAGNOSE_DESCRIPTION =
+  "Read-only persistence diagnostic. Compares the current in-memory todo snapshot with the durable session-branch replay. Use only to investigate suspected reload, tree-navigation, or compaction state drift; it never changes todos.";
+
 export const TODOWRITE_GUIDELINES = [
   "For multi-step work (3+ steps), codebase explain/explore/review, or when the user gives a list of tasks, call todo_write BEFORE starting — do not skip tracking.",
   "Pass the full list every todo_write call (full replace). Keep exactly one todo in_progress; mark completed immediately when a step finishes — never leave a stale in_progress.",
   "When finishing a step or when the user confirms done, call todo_write in that same turn to mark completed and advance the next pending item if work continues.",
-  "Do not invent TaskCreate/TaskUpdate tools — use todo_write/todo_read only.",
+    "Do not invent TaskCreate/TaskUpdate tools — use todo_write/todo_read; todo_diagnose is read-only troubleshooting.",
   "Do not call todo_write and todo_read in the same parallel tool batch.",
 ];
 

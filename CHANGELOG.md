@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.9 (2026-07-15)
+
+- **Atomic write ordering**: `setTodos()` happens *after* `pi.appendEntry()`
+  succeeds. If appendEntry throws (stale-ctx or persistence error), the in-memory
+  store is never mutated — no more desync between live state and durable state.
+- **Stale-ctx now returns error**: Instead of silently swallowing "stale after
+  session replacement", the tool returns an error so the LLM knows the write
+  was not committed.
+- **4 atomicity tests**: Mock appendEntry rejects with stale-ctx / persistence
+  errors and asserts store is unchanged. 102/102 tests passing.
+
 ## 0.2.8 (2026-07-15)
 
 - **Replay**: revert broken timestamp-based hardening; Pi guarantees getBranch() is chronological, so original last-entry-wins algorithm is correct and simpler.

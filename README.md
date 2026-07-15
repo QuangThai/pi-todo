@@ -6,7 +6,7 @@
 
 OpenCode-style session todo checklist for the [pi coding agent](https://pi.dev).
 
-Adds `todo_write` / `todo_read`, a live `# Todos` overlay above the editor (`[ ]` / `[•]` / `[✓]` / `[×]`), and branch-replay persistence (survives `/reload`, tree nav, and custom-entry durability across compaction).
+Adds `todo_write` / `todo_read` / `todo_diagnose`, a live `# Todos` overlay above the editor (`[ ]` / `[•]` / `[✓]` / `[×]`), and branch-replay persistence (survives `/reload`, tree nav, and custom-entry durability across compaction).
 
 ## Install
 
@@ -52,6 +52,10 @@ Rules enforced by the tool:
 
 Returns the current list as text + JSON. Prefer the overlay for at-a-glance status; avoid calling it in the same parallel batch as `todo_write`.
 
+### `todo_diagnose`
+
+Read-only persistence check for suspected reload, tree-navigation, or compaction drift. It compares the live in-memory snapshot against a replay of the durable session branch and reports `consistent` or `mismatch`; it never changes todos.
+
 ## Overlay
 
 Shown above the editor while any **open** todo remains (`pending` / `in_progress`).
@@ -67,6 +71,7 @@ Heading shows open + running counts + background-color progress bar, e.g. `# Tod
 Items within each status group are sorted by priority (high → medium → low).
 When space is tight, completed/cancelled items collapse into `+N done`.
 A blank line separates the heading from the first todo row for visual breathing room.
+Successful `todo_write` results display `✓ Saved`, meaning the durable checkpoint was accepted before the in-memory snapshot was updated.
 
 ## Development
 

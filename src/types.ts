@@ -21,6 +21,7 @@ export interface TodoWriteDetails {
 export const TODO_STATE_ENTRY_TYPE = "pi-todo.state";
 export const TOOL_WRITE = "todo_write";
 export const TOOL_READ = "todo_read";
+export const TOOL_DIAGNOSE = "todo_diagnose";
 export const WIDGET_KEY = "pi-todo";
 export const MAX_OVERLAY_LINES = 12;
 /** Max characters per todo content after sanitize (context/tool safety). */

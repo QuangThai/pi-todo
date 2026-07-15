@@ -20,5 +20,8 @@ export const TodoWriteParams = Type.Object({
 
 export const TodoReadParams = Type.Object({});
 
+/** Read-only persistence check; deliberately accepts no mutation input. */
+export const TodoDiagnoseParams = Type.Object({});
+
 export type TodoWriteInput = Static<typeof TodoWriteParams>;
 export type TodoItemInput = Static<typeof TodoItemSchema>;

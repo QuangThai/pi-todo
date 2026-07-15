@@ -1,7 +1,7 @@
 /**
  * pi-todo — OpenCode-like session todo checklist for Pi.
  *
- * Tools: todo_write (full replace), todo_read
+ * Tools: todo_write (full replace), todo_read, todo_diagnose (read-only)
  * Overlay: # Todos with [ ]/[•]/[✓]/[×] above the editor
  * Persistence: toolResult details + custom entry, replayed from branch
  * Reminder: pi-tasks-style cadence → transient <system-reminder> via context
@@ -31,11 +31,12 @@ import {
 import { replayFromBranch } from "./replay.js";
 import { clearTodos, getTodos, setTodos } from "./store.js";
 import { registerTodoReadTool } from "./tools/todoread.js";
+import { registerTodoDiagnoseTool } from "./tools/tododiagnose.js";
 import { registerTodoWriteTool } from "./tools/todowrite.js";
-import { TOOL_READ, TOOL_WRITE } from "./types.js";
+import { TOOL_DIAGNOSE, TOOL_READ, TOOL_WRITE } from "./types.js";
 import { hasOpenTodos, isOpenTodo } from "./validate.js";
 
-const TODO_TOOL_NAMES = new Set([TOOL_WRITE, TOOL_READ]);
+const TODO_TOOL_NAMES = new Set([TOOL_WRITE, TOOL_READ, TOOL_DIAGNOSE]);
 
 const cadenceConfig: CadenceConfig = {
   reminderInterval: REMINDER_INTERVAL,
@@ -87,6 +88,7 @@ export default function (pi: ExtensionAPI): void {
 
   registerTodoWriteTool(pi, { onCommit: refreshOverlay });
   registerTodoReadTool(pi);
+  registerTodoDiagnoseTool(pi);
 
   // Cold-start + completion nudges. Tool description alone is often ignored;
   // prompt-aware section + one-shot context reminder (pi-tasks style) is stronger.
