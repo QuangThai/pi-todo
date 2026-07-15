@@ -14,6 +14,18 @@ function prioritySort(a: TodoItem, b: TodoItem): number {
   return (PRIORITY_RANK[a.priority] ?? 2) - (PRIORITY_RANK[b.priority] ?? 2);
 }
 
+/** Active work always leads the overlay, then pending, then terminal work. */
+function statusPrioritySort(a: TodoItem, b: TodoItem): number {
+  const statusRank: Record<TodoStatus, number> = {
+    in_progress: 0,
+    pending: 1,
+    completed: 2,
+    cancelled: 2,
+  };
+  const diff = statusRank[a.status] - statusRank[b.status];
+  return diff !== 0 ? diff : prioritySort(a, b);
+}
+
 export function getTodoMarker(status: TodoStatus): string {
   switch (status) {
     case "completed":
@@ -36,18 +48,7 @@ export function formatTodoListText(todos: readonly TodoItem[], summary: string):
   if (todos.length === 0) return summary;
 
   // in_progress first, then pending (sorted by priority), then terminal
-  const sorted = [...todos].sort((a, b) => {
-    const statusRank: Record<string, number> = {
-      in_progress: 0,
-      pending: 1,
-      completed: 2,
-      cancelled: 2,
-    };
-    const diff =
-      (statusRank[a.status] ?? 2) - (statusRank[b.status] ?? 2);
-    if (diff !== 0) return diff;
-    return prioritySort(a, b);
-  });
+  const sorted = [...todos].sort(statusPrioritySort);
 
   if (todos.length <= MAX_RESULT_LINES) {
     return [summary, ...sorted.map(formatPlainTodoLine)].join("\n");
@@ -99,7 +100,7 @@ export function selectOverlayLayout(
   const bodyBudget = Math.max(1, maxLines - 1);
   if (todos.length <= bodyBudget) {
     // All fit — show everything
-    return { visible: [...todos].sort(prioritySort), hiddenCount: 0, terminalCount: 0 };
+    return { visible: [...todos].sort(statusPrioritySort), hiddenCount: 0, terminalCount: 0 };
   }
 
   const innerBudget = Math.max(1, bodyBudget - 1);
@@ -125,7 +126,9 @@ export function selectOverlayLayout(
 
   const terminalCollapsed = terminal.length > 0 && picked.length >= innerBudget;
   const remaining = todos.length - picked.length;
-  const hiddenCount = terminalCollapsed ? remaining : Math.max(0, remaining - terminal.length);
+  const hiddenCount = terminalCollapsed
+    ? remaining - terminal.length
+    : Math.max(0, remaining - terminal.length);
 
   return { visible: picked, hiddenCount, terminalCount: terminalCollapsed ? terminal.length : 0 };
 }
