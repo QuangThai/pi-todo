@@ -1,6 +1,6 @@
 {
   "name": "@nguyenquangthai/pi-todo",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "OpenCode-like session todo checklist for the pi coding agent — todowrite/todoread with a live TUI overlay",
   "type": "module",
   "author": "QuangThai",

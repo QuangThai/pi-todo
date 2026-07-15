@@ -156,14 +156,16 @@ export function renderOverlayLines(
   const total = todos.length;
   const done = total - open;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  const barWidth = Math.max(4, Math.min(12, Math.floor(width / 8)));
+  const barWidth = Math.max(2, Math.min(6, Math.floor(width / 16)));
   const filled = Math.round((barWidth * done) / total);
-  const bar = "#".repeat(filled) + "·".repeat(Math.max(0, barWidth - filled));
+  const bar =
+    "█".repeat(filled) + "░".repeat(Math.max(0, barWidth - filled));
+  const pctPad = pct.toString().padStart(3);
 
   const heading = truncate(
     theme.fg("accent", theme.bold(`# Todos`)) +
       theme.fg("dim", ` (${open} open, ${running} running)`) +
-      theme.fg("muted", ` ${bar} ${pct}%`),
+      theme.fg("muted", ` ${bar} ${pctPad}%`),
   );
 
   // Small gap between heading and first row — budget -1 to account for the blank line

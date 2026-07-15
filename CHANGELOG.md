@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.6 (2026-07-15)
+
+- Restore Unicode block chars (`█`/`░`) for progress bar — looks cleaner.
+- Fix alignment: halve bar width (double-width chars) + pad percentage to 3 chars so heading never shifts when % changes.
+- README: update progress bar example to match.
+
 ## 0.2.5 (2026-07-15)
 
 - Fix progress bar: use single-width ASCII (`#`/`·`) instead of double-width Unicode (`█`/`░`) to avoid alignment issues in terminal.
