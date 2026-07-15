@@ -33,9 +33,14 @@ function isWriteDetails(value: unknown): value is TodoWriteDetails {
 }
 
 /**
- * Last-write-wins over the current branch:
- * - custom `pi-todo.state` entries
- * - `todo_write` toolResult details
+ * Replay todo state from the session branch.
+ *
+ * Pi guarantees getBranch() returns entries in root→leaf (chronological) order.
+ * Last valid entry wins — custom `pi-todo.state` entries and `todo_write`
+ * toolResult details are both tracked.
+ *
+ * Error envelopes (e.g. validation failures) are skipped so they never
+ * overwrite a good state.
  */
 export function replayFromBranch(ctx: {
   sessionManager: { getBranch(): Iterable<unknown> };
@@ -53,12 +58,12 @@ export function replayFromBranch(ctx: {
     }
 
     if (e.type !== "message" || !isRecord(e.message)) continue;
-    const msg = e.message;
+    const msg = e.message as Record<string, unknown>;
     if (msg.role !== "toolResult" || msg.toolName !== TOOL_WRITE) continue;
     if (!isWriteDetails(msg.details)) continue;
     // Skip error envelopes — they did not commit
-    if (msg.details.error) continue;
-    todos = msg.details.todos.map((t) => ({ ...t }));
+    if ((msg.details as TodoWriteDetails).error) continue;
+    todos = (msg.details as TodoWriteDetails).todos.map((t) => ({ ...t }));
   }
 
   return todos;

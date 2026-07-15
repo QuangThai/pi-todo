@@ -40,8 +40,15 @@ export function registerTodoWriteTool(
         if (!result.unchanged) {
           try {
             pi.appendEntry(TODO_STATE_ENTRY_TYPE, { todos: result.todos });
-          } catch {
-            // Host may reject; toolResult details still provide branch replay.
+          } catch (e) {
+            // Only swallow host-reject errors (stale context, unsupported custom entry).
+            // Let real runtime/disk/persistence errors propagate so they surface to the user.
+            if (/stale after session replacement/i.test(String(e))) {
+              // Expected: session was replaced, this append is discarded.
+              // toolResult details still provide branch replay.
+            } else {
+              throw e;
+            }
           }
         }
 

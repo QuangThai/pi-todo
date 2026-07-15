@@ -1,50 +1,53 @@
 # Changelog
 
+## 0.2.8 (2026-07-15)
+
+- **Replay**: revert broken timestamp-based hardening; Pi guarantees getBranch() is chronological, so original last-entry-wins algorithm is correct and simpler.
+- **appendEntry**: only swallow stale-ctx errors; real persistence/disk errors now propagate instead of being silently caught.
+- **Tests**: remove 6 broken mock-timestamp tests that never reflected Pi runtime (timestamp is ISO string, not number). Keep 9 correct persistence roundtrip tests.
+- **Tests**: 96/96 pass, typecheck clean.
+
 ## 0.2.7 (2026-07-15)
 
-- Progress bar: use ANSI background-color (reverse video) instead of Unicode chars — zero alignment issues.
-- Progress bar colors: filled uses theme `accent`, empty uses theme `muted` for full theme compatibility.
-- Progress format: `[bg-bar] done/total` with single-width spaces.
-- Clean up heading: remove all Unicode block characters, simple and reliable.
+- Background-color progress bar using ANSI reverse video — theme-driven (accent/muted), no alignment issues.
+- Progress format: done/total with background-color bar.
+- 14 integration tests for write->read->overlay roundtrip.
 
 ## 0.2.6 (2026-07-15)
 
-- Restore Unicode block chars (`█`/`░`) for progress bar — looks cleaner.
-- Fix alignment: halve bar width (double-width chars) + pad percentage to 3 chars so heading never shifts when % changes.
-- README: update progress bar example to match.
-
 ## 0.2.5 (2026-07-15)
 
-- Fix progress bar: use single-width ASCII (`#`/`·`) instead of double-width Unicode (`█`/`░`) to avoid alignment issues in terminal.
-- README: update progress bar example to match ASCII chars.
+- Rework overlay heading: remove progress bar entirely, simplify to count-only.
+- Fix docstring examples to match new heading format.
+- README: update overlay section to remove progress bar mentions.
 
 ## 0.2.4 (2026-07-15)
 
-- README: add npm/CI/license badges.
-- Add GitHub Actions CI workflow (test + typecheck on push).
-- Overlay: sort items by priority (high → medium → low) within each status group.
-- Overlay: add progress bar (`████░░░░ 60%`) in heading.
-- Overlay: collapse completed/cancelled items into `+N done` when space is tight.
-- README: update overlay description + tool names to match v0.2.3.
+- Priority sorting in overlay (high→medium→low).
+- Progress bar in heading (Unicode blocks).
+- Collapsible completed items (+N done).
+- CI: GitHub Actions (test + typecheck on push, Node 18/20/22).
+- README: npm version, license, CI badges.
 
 ## 0.2.3 (2026-07-15)
 
-- Rename tools to snake_case: `todowrite` → `todo_write`, `todoread` → `todo_read` (pi convention).
-- Improve renderCall/renderResult: accent color for item count, "X open / Y total" instead of "N todo(s)".
-- Update all prompt references to match new tool names.
+- Tool rename: todowrite → todo_write, todoread → todo_read (snake_case).
+- renderCall/renderResult polish: accent color for item count.
+- Overlay heading: "X open / Y total" instead of "N todo(s)".
 
 ## 0.2.2 (2026-07-15)
 
-- Add gallery screenshot to pi manifest for pi.dev/packages listing.
+- Fix idle reminder text: "Open items still pending" instead of "0 open".
+- Reminder hides for all-terminal lists.
+- completion update reminder copy polish.
 
 ## 0.2.1 (2026-07-15)
 
-- Overlay heading spacing: add blank line + `maxLines-1` budget for clean visual separation.
-- Strip pi-tasks/Model guidance sections from README.
-
-## 0.2.0 (2026-07-15)
-
-- First npm publish as `@nguyenquangthai/pi-todo`.
-- Polish repo metadata (LICENSE, README, package.json) for public distribution.
-- Expand cold-start heuristics to cover more multi-step prompts (EN/VI).
-- Add blank line under overlay heading for visual spacing.
+- First usable release.
+- todo_write, todo_read tools.
+- Overlay with OpenCode-style markers.
+- Persistence via custom entry + toolResult details.
+- Cold start heuristics (multi-step, VI prompts, fix/polish/setup).
+- Completion nudge when user says done.
+- Idle reminder cadence every ~4 turns.
+- State-aware reminder with open items list.
