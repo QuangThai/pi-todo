@@ -139,7 +139,7 @@ export interface RenderOverlayOptions {
  * - open    = pending + in_progress
  * - running = in_progress only (0 or 1 after a valid todo_write)
  * Overlay is hidden when open === 0, so "(0 open, 0 running)" is never shown.
- * Includes a visual progress bar: completed / total.
+ * Includes a background-color progress bar using theme colors.
  */
 export function renderOverlayLines(
   todos: readonly TodoItem[],
@@ -153,19 +153,22 @@ export function renderOverlayLines(
   const truncate = (line: string) => truncateToWidth(line, width, "…");
   const open = countOpenTodos(todos);
   const running = countRunningTodos(todos);
+
+  // Background-color progress bar via reverse video — uses theme accent/dim
   const total = todos.length;
   const done = total - open;
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  const barWidth = Math.max(2, Math.min(6, Math.floor(width / 16)));
+  const barWidth = Math.max(4, Math.min(10, Math.floor(width / 8)));
   const filled = Math.round((barWidth * done) / total);
-  const bar =
-    "█".repeat(filled) + "░".repeat(Math.max(0, barWidth - filled));
-  const pctPad = pct.toString().padStart(3);
+  const REV = "\x1b[7m";
+  const filledBar = REV + theme.fg("accent", " ".repeat(filled));
+  const emptyBar =
+    filled < barWidth ? REV + theme.fg("muted", " ".repeat(barWidth - filled)) : "";
+  const bar = filledBar + emptyBar + "\x1b[0m";
 
   const heading = truncate(
     theme.fg("accent", theme.bold(`# Todos`)) +
       theme.fg("dim", ` (${open} open, ${running} running)`) +
-      theme.fg("muted", ` ${bar} ${pctPad}%`),
+      ` ${bar}` + theme.fg("dim", ` ${done}/${total}`),
   );
 
   // Small gap between heading and first row — budget -1 to account for the blank line

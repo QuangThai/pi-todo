@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.7 (2026-07-15)
+
+- Progress bar: use ANSI background-color (reverse video) instead of Unicode chars — zero alignment issues.
+- Progress bar colors: filled uses theme `accent`, empty uses theme `muted` for full theme compatibility.
+- Progress format: `[bg-bar] done/total` with single-width spaces.
+- Clean up heading: remove all Unicode block characters, simple and reliable.
+
 ## 0.2.6 (2026-07-15)
 
 - Restore Unicode block chars (`█`/`░`) for progress bar — looks cleaner.
