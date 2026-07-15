@@ -6,20 +6,16 @@ Adds `todowrite` / `todoread`, a live `# Todos` overlay above the editor (`[ ]` 
 
 ## Install
 
-From GitHub:
-
 ```bash
-pi install git:github.com/QuangThai/pi-todo
-# or
-pi install https://github.com/QuangThai/pi-todo
+pi install npm:@nguyenquangthai/pi-todo
 ```
 
-Local path (development):
+Or from source:
 
 ```bash
-pi install /absolute/path/to/pi-todo
-# or without installing:
-pi -e ./src/index.ts
+git clone https://github.com/QuangThai/pi-todo.git
+cd pi-todo
+pi install .
 ```
 
 Then restart pi or run `/reload`.

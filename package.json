@@ -1,6 +1,6 @@
 {
-  "name": "pi-todo",
-  "version": "0.1.0",
+  "name": "@nguyenquangthai/pi-todo",
+  "version": "0.2.0",
   "description": "OpenCode-like session todo checklist for the pi coding agent — todowrite/todoread with a live TUI overlay",
   "type": "module",
   "author": "QuangThai",
@@ -27,12 +27,17 @@
   "files": [
     "src",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm test && npm run typecheck"
   },
   "pi": {
     "extensions": ["./src/index.ts"]
