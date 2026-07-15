@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.0 (2026-07-15)
+
+- **ID invariant hardening**: `validateTodoWrite` rejects items with explicit `id`
+  that doesn't exist in current list. New items must omit `id` (auto-assign).
+- **`ensureTodoIds` tuple matching**: Matches by `(content+status+priority)` first,
+  then by unique content-only. Duplicate-content items get fresh UUIDs instead
+  of risking mis-assignment.
+- **`todo_update` atomicity**: Stale-ctx returns error, real errors propagate,
+  setTodos after appendEntry — matching todo_write guarantees.
+- **Status-first shared sort**: `statusPrioritySort()` extracted and shared by
+  `formatTodoListText` (tool output) and `selectOverlayLayout` (overlay) —
+  in_progress → pending → terminal, regardless of overflow.
+- **Fixed double-count bug**: Terminal items no longer counted in both `+N done`
+  AND `+N more` on overlay overflow.
+- **Lifecycle E2E test**: Write → update → tree → compact → shutdown → restart,
+  verifying stable IDs and status throughout.
+- **125 tests**, typecheck clean, CI green (Node 20 + 22).
+
 ## 0.2.9 (2026-07-15)
 
 - **Atomic write ordering**: `setTodos()` happens *after* `pi.appendEntry()`
