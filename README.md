@@ -1,8 +1,12 @@
 # pi-todo
 
+[![npm version](https://img.shields.io/npm/v/@nguyenquangthai/pi-todo?color=blue)](https://www.npmjs.com/package/@nguyenquangthai/pi-todo)
+[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+[![Tests](https://github.com/QuangThai/pi-todo/actions/workflows/ci.yml/badge.svg)](https://github.com/QuangThai/pi-todo/actions)
+
 OpenCode-style session todo checklist for the [pi coding agent](https://pi.dev).
 
-Adds `todowrite` / `todoread`, a live `# Todos` overlay above the editor (`[ ]` / `[•]` / `[✓]` / `[×]`), and branch-replay persistence (survives `/reload`, tree nav, and custom-entry durability across compaction).
+Adds `todo_write` / `todo_read`, a live `# Todos` overlay above the editor (`[ ]` / `[•]` / `[✓]` / `[×]`), and branch-replay persistence (survives `/reload`, tree nav, and custom-entry durability across compaction).
 
 ## Install
 
@@ -22,7 +26,7 @@ Then restart pi or run `/reload`.
 
 ## Tools
 
-### `todowrite`
+### `todo_write`
 
 Full-replace the session todo list. Each call must pass the **complete** list.
 
@@ -44,9 +48,9 @@ Rules enforced by the tool:
 - Status: `pending` | `in_progress` | `completed` | `cancelled`
 - Tool text echo caps at **40** lines (`+N more` in the text body; full list still in `details` / JSON)
 
-### `todoread`
+### `todo_read`
 
-Returns the current list as text + JSON. Prefer the overlay for at-a-glance status; avoid calling it in the same parallel batch as `todowrite`.
+Returns the current list as text + JSON. Prefer the overlay for at-a-glance status; avoid calling it in the same parallel batch as `todo_write`.
 
 ## Overlay
 
@@ -54,11 +58,14 @@ Shown above the editor while any **open** todo remains (`pending` / `in_progress
 
 Hidden when the list is empty or every item is `completed` / `cancelled`.
 
-Heading shows open + running counts, e.g. `# Todos (2 open, 1 running)`:
+Heading shows open + running counts + progress bar, e.g. `# Todos (2 open, 1 running) ████░░░░ 60%`:
 
 - **open** = `pending` + `in_progress`
 - **running** = `in_progress` only (0 or 1 after a valid write)
+- **progress bar** = completed / total (adaptive width)
 
+Items within each status group are sorted by priority (high → medium → low).
+When space is tight, completed/cancelled items collapse into `+N done`.
 A blank line separates the heading from the first todo row for visual breathing room.
 
 ## Development
