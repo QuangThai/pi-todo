@@ -1,125 +1,113 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>pi-todo overlay preview</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: #0d1117;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
-    padding: 40px;
-  }
-  .editor {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 8px;
-    width: 720px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-    overflow: hidden;
-  }
-  /* Title bar */
-  .titlebar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 16px;
-    background: #0d1117;
-    border-bottom: 1px solid #21262d;
-  }
-  .dot {
-    width: 12px; height: 12px;
-    border-radius: 50%;
-  }
-  .dot.r { background: #ff7b72; }
-  .dot.y { background: #d29922; }
-  .dot.g { background: #3fb950; }
-  .title-text {
-    color: #8b949e;
-    font-size: 13px;
-    margin-left: 8px;
-  }
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>pi-todo screenshot source</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --canvas: #0d1117;
+      --panel: #0d1117;
+      --border: #30363d;
+      --divider: #21262d;
+      --text: #c9d1d9;
+      --muted: #484f58;
+      --accent: #58a6ff;
+      --success: #3fb950;
+      --warning: #d29922;
+    }
 
-  /* Overlay content */
-  .overlay {
-    padding: 16px 20px 14px;
-    background: #0d1117;
-    border-bottom: 1px solid #21262d;
-  }
-  .heading {
-    color: #58a6ff;
-    font-weight: 700;
-    font-size: 15px;
-    line-height: 1.5;
-  }
-  .dim {
-    color: #484f58;
-    font-weight: 400;
-  }
-  .spacer {
-    height: 4px;
-  }
-  .todo-row {
-    padding: 2px 0;
-    font-size: 14px;
-    line-height: 1.6;
-    color: #c9d1d9;
-  }
-  .todo-row.done {
-    color: #484f58;
-    text-decoration: line-through;
-  }
-  .todo-row.active {
-    color: #d29922;
-  }
-  .marker { font-weight: 400; }
-  .marker.done { color: #3fb950; }
-  .marker.active { color: #d29922; }
+    * { box-sizing: border-box; }
 
-  /* Editor area (empty bottom) */
-  .editor-area {
-    height: 100px;
-    background: #0d1117;
-  }
-</style>
+    html, body { margin: 0; min-width: 1038px; min-height: 746px; }
+
+    body {
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background: var(--canvas);
+      font-family: "Cascadia Code", "Cascadia Mono", Consolas, monospace;
+    }
+
+    .frame {
+      position: relative;
+      width: 1038px;
+      height: 746px;
+      background: var(--canvas);
+    }
+
+    .terminal {
+      position: absolute;
+      top: 220px;
+      left: 159px;
+      width: 720px;
+      height: 305px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .titlebar {
+      display: flex;
+      align-items: center;
+      height: 41px;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--divider);
+      color: #8b949e;
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .traffic-lights {
+      display: flex;
+      gap: 8px;
+      margin-right: 16px;
+    }
+
+    .traffic-lights span {
+      display: block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .traffic-lights span:nth-child(1) { background: #ff7b72; }
+    .traffic-lights span:nth-child(2) { background: #d29922; }
+    .traffic-lights span:nth-child(3) { background: #3fb950; }
+
+    .title { letter-spacing: 0.01em; }
+
+    .content {
+      padding: 16px 20px;
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 27px;
+      white-space: pre;
+    }
+
+    .heading { color: var(--accent); }
+    .counts { color: var(--muted); font-weight: 400; }
+    .completed { color: var(--success); font-weight: 400; }
+    .active { color: var(--warning); }
+    .pending { color: var(--text); }
+  </style>
 </head>
 <body>
-<div class="editor">
-  <!-- Title bar -->
-  <div class="titlebar">
-    <div class="dot r"></div>
-    <div class="dot y"></div>
-    <div class="dot g"></div>
-    <span class="title-text">pi — pi-todo</span>
-  </div>
-
-  <!-- Overlay -->
-  <div class="overlay">
-    <div class="heading">
-      # Todos <span class="dim">(3 open, 1 running)</span>
-    </div>
-    <div class="spacer"></div>
-    <div class="todo-row done">
-      <span class="marker done">[✓]</span> Review API contracts
-    </div>
-    <div class="todo-row active">
-      <span class="marker active">[•]</span> Implement heading spacing
-    </div>
-    <div class="todo-row">
-      <span class="marker">[ ]</span> Add cold-start heuristics
-    </div>
-    <div class="todo-row">
-      <span class="marker">[ ]</span> Write E2E tests
-    </div>
-  </div>
-
-  <!-- Empty editor area -->
-  <div class="editor-area"></div>
-</div>
+  <!-- Source composition for media/screenshot.png. Render at 1038 × 746. -->
+  <main class="frame" aria-label="pi-todo overlay screenshot">
+    <section class="terminal" aria-label="pi-todo terminal preview">
+      <header class="titlebar">
+        <span class="traffic-lights" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span class="title">pi — pi-todo</span>
+      </header>
+      <div class="content"><span class="heading"># Todos</span><span class="counts"> (3 open, 1 running, 1 completed)</span>
+<span class="completed">[✓] Review contracts</span>
+<span class="active">[•] Implement heading spacing</span>
+<span class="pending">[ ] Add cold-start heuristics</span>
+<span class="pending">[ ] Write E2E tests</span></div>
+    </section>
+  </main>
 </body>
 </html>

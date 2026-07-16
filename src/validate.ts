@@ -228,3 +228,8 @@ export function countOpenTodos(todos: readonly TodoItem[]): number {
 export function countRunningTodos(todos: readonly TodoItem[]): number {
   return todos.filter((t) => t.status === "in_progress").length;
 }
+
+/** Count successfully finished items; cancelled items are intentionally excluded. */
+export function countCompletedTodos(todos: readonly TodoItem[]): number {
+  return todos.filter((todo) => todo.status === "completed").length;
+}

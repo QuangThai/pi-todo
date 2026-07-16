@@ -128,7 +128,7 @@ describe("validate→store→format integration", () => {
     expect(text).toContain("[ ] Review");
   });
 
-  it("overlay heading matches store counts", () => {
+  it("overlay keeps store counts while retaining stored items", () => {
     setTodos([
       t("done", "completed"),
       t("active", "in_progress"),
@@ -136,8 +136,7 @@ describe("validate→store→format integration", () => {
     ]);
 
     const lines = renderOverlayLines(getTodos(), identityTheme, 80);
-    expect(lines[0]).toContain("# Todos");
-    expect(lines[0]).toContain("(2 open, 1 running)");
+    expect(lines[0]).toBe("# Todos (2 open, 1 running, 1 completed)");
     expect(lines).toContain("[•] active");
     expect(lines).toContain("[ ] next");
   });

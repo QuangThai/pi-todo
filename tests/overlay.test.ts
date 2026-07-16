@@ -9,7 +9,7 @@ import {
 } from "../src/format.js";
 import type { TodoItem } from "../src/types.js";
 import { MAX_RESULT_LINES } from "../src/types.js";
-import { countOpenTodos, countRunningTodos } from "../src/validate.js";
+import { countCompletedTodos, countOpenTodos, countRunningTodos } from "../src/validate.js";
 
 const identityTheme = {
   fg: (_c: string, s: string) => s,
@@ -59,7 +59,7 @@ describe("shouldShowOverlay", () => {
 });
 
 describe("open / running counts", () => {
-  it("open = pending + in_progress; running = in_progress only", () => {
+  it("open = pending + in_progress; running = in_progress; completed excludes cancelled", () => {
     const todos = [
       t("done", "completed"),
       t("active", "in_progress"),
@@ -68,29 +68,34 @@ describe("open / running counts", () => {
     ];
     expect(countOpenTodos(todos)).toBe(2);
     expect(countRunningTodos(todos)).toBe(1);
+    expect(countCompletedTodos(todos)).toBe(1);
   });
 
   it("pending-only → open=N, running=0", () => {
     const todos = [t("a", "pending"), t("b", "pending"), t("c", "pending")];
     expect(countOpenTodos(todos)).toBe(3);
     expect(countRunningTodos(todos)).toBe(0);
+    expect(countCompletedTodos(todos)).toBe(0);
   });
 
   it("single in_progress → open=1, running=1", () => {
     const todos = [t("only", "in_progress")];
     expect(countOpenTodos(todos)).toBe(1);
     expect(countRunningTodos(todos)).toBe(1);
+    expect(countCompletedTodos(todos)).toBe(0);
   });
 
   it("terminal-only → open=0, running=0", () => {
     const todos = [t("a", "completed"), t("b", "cancelled")];
     expect(countOpenTodos(todos)).toBe(0);
     expect(countRunningTodos(todos)).toBe(0);
+    expect(countCompletedTodos(todos)).toBe(1);
   });
 
   it("empty → open=0, running=0", () => {
     expect(countOpenTodos([])).toBe(0);
     expect(countRunningTodos([])).toBe(0);
+    expect(countCompletedTodos([])).toBe(0);
   });
 
   it("invariant: running <= open", () => {
@@ -148,14 +153,33 @@ describe("formatPlainTodoLine", () => {
 });
 
 describe("renderOverlayLines", () => {
-  it("includes open and running counts in heading", () => {
+  it("keeps open, running, and completed counts without progress details", () => {
     const lines = renderOverlayLines(
       [t("a", "completed"), t("b", "in_progress"), t("c", "pending")],
       identityTheme,
       80,
     );
-    expect(lines[0]).toContain("# Todos");
-    expect(lines[0]).toContain("(2 open, 1 running)");
+    expect(lines[0]).toBe("# Todos (2 open, 1 running, 1 completed)");
+  });
+
+  it("shows correct counts with no completed work", () => {
+    const lines = renderOverlayLines([t("a", "pending"), t("b", "pending")], identityTheme, 80);
+    expect(lines[0]).toBe("# Todos (2 open, 0 running, 0 completed)");
+  });
+
+  it("excludes completed and cancelled items from open/running counts", () => {
+    const lines = renderOverlayLines(
+      [
+        t("done", "completed"),
+        t("drop", "cancelled"),
+        t("go", "in_progress"),
+        t("next", "pending"),
+        t("later", "pending"),
+      ],
+      identityTheme,
+      80,
+    );
+    expect(lines[0]).toBe("# Todos (3 open, 1 running, 1 completed)");
   });
 
   it("has a minimal blank-line gap between heading and first todo row", () => {
@@ -167,16 +191,6 @@ describe("renderOverlayLines", () => {
     expect(lines[0]).toContain("# Todos");
     expect(lines[1]).toBe("");
     expect(lines[2]).toMatch(/^\[/);
-  });
-
-  it("shows 0 running when none in_progress", () => {
-    const lines = renderOverlayLines([t("a", "pending"), t("b", "pending")], identityTheme, 80);
-    expect(lines[0]).toContain("(2 open, 0 running)");
-  });
-
-  it("shows 1 open, 1 running for solo in_progress", () => {
-    const lines = renderOverlayLines([t("solo", "in_progress")], identityTheme, 80);
-    expect(lines[0]).toContain("(1 open, 1 running)");
   });
 
   it("returns empty when no open work (never shows 0 open heading)", () => {
@@ -203,20 +217,6 @@ describe("renderOverlayLines", () => {
     expect(lines.some((line) => line.includes("+2 more"))).toBe(true);
   });
 
-  it("counts ignore completed/cancelled for open/running", () => {
-    const lines = renderOverlayLines(
-      [
-        t("done", "completed"),
-        t("drop", "cancelled"),
-        t("go", "in_progress"),
-        t("next", "pending"),
-        t("later", "pending"),
-      ],
-      identityTheme,
-      80,
-    );
-    expect(lines[0]).toContain("(3 open, 1 running)");
-  });
 });
 
 describe("formatTodoListText", () => {

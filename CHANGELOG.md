@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.3 (2026-07-16)
+
+### Changed
+
+- **Overlay heading**: Shows open, running, and completed counts. Completed
+  counts include only `completed` todos; `cancelled` todos remain excluded.
+- **Simplified status display**: Removed the ANSI progress bar and `done/total`
+  counter from the overlay.
+- **Documentation and screenshot**: Updated the README, screenshot PNG, and
+  screenshot HTML source to match the new heading.
+
+## 0.3.2 (2026-07-16)
+
+### Fixed
+
+- **Todo ID integrity**: Prevented id-less todos from taking IDs explicitly
+  retained by another todo during a full `todo_write` replacement.
+- **Diagnostics**: Added ID-integrity reporting and `repair_needed` status to
+  `todo_diagnose`.
+- **Mutation bounds**: Capped todo mutations and persisted snapshots at 200
+  items.
+
 ## 0.3.1 (2026-07-15)
 
 ### Fixed

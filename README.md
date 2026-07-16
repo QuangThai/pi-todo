@@ -81,11 +81,11 @@ Shown above the editor while any **open** todo remains (`pending` / `in_progress
 
 Hidden when the list is empty or every item is `completed` / `cancelled`.
 
-Heading shows open + running counts + background-color progress bar, e.g. `# Todos (3 open, 1 running) ▓▓▓▓░░░░ 1/4`:
+Heading shows open, running, and completed counts, e.g. `# Todos (3 open, 1 running, 1 completed)`:
 
 - **open** = `pending` + `in_progress`
 - **running** = `in_progress` only (0 or 1 after a valid write)
-- **progress bar** = ANSI background color via reverse video, using theme `accent` (filled) and `muted` (empty)
+- **completed** = `completed` only; `cancelled` todos are not counted
 
 Items always stay in the array's workflow order; status changes only their marker/color.
 When space is tight, the overlay shows the earliest checklist items and `+N more`. If the active item is outside that prefix, it is repeated as `Active: [•] …` rather than moved ahead of earlier work.
