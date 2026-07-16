@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { sanitizeTodoText } from "../src/sanitize.js";
-import { ensureTodoIds, validateTodoWrite, hasOpenTodos, todosEqual } from "../src/validate.js";
-import type { TodoItem } from "../src/types.js";
+import { ensureTodoIds, getTodoIntegrityIssues, validateTodoWrite, hasOpenTodos, todosEqual } from "../src/validate.js";
+import { MAX_TODO_ITEMS, type TodoItem } from "../src/types.js";
 
 const sample = (overrides: Partial<TodoItem> = {}): TodoItem => ({
   content: "Do thing",
@@ -203,6 +203,31 @@ describe("ensureTodoIds", () => {
     expect(result[1].id).toBe("a1");   // pending/high → "a1"
   });
 
+  it("rejects a list larger than the payload limit", () => {
+    const result = validateTodoWrite(
+      Array.from({ length: MAX_TODO_ITEMS + 1 }, (_, i) => sample({ content: `Task ${i}` })),
+      [],
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain(`at most ${MAX_TODO_ITEMS}`);
+  });
+
+  it("does not let an id-less item claim an ID explicitly preserved later in the payload", () => {
+    const current = [
+      { id: "task-a", content: "Task A", status: "pending" as const, priority: "high" as const },
+    ];
+    const incoming = [
+      { content: "Task A", status: "pending" as const, priority: "high" as const },
+      { id: "task-a", content: "Task C (diff)", status: "pending" as const, priority: "low" as const },
+    ];
+
+    const result = ensureTodoIds(incoming, current);
+
+    expect(result[0].id).not.toBe("task-a");
+    expect(result[1].id).toBe("task-a");
+    expect(new Set(result.map((todo) => todo.id)).size).toBe(result.length);
+  });
+
   it("generates fresh IDs for duplicate content items (ambiguous)", () => {
     const current = [
       { id: "a1", content: "Same", status: "pending" as const, priority: "high" as const },
@@ -228,5 +253,18 @@ describe("ensureTodoIds", () => {
     const result = ensureTodoIds(incoming, current);
     // Tuple doesn't match (different status) but content is unique → fallback borrows "uniq"
     expect(result[0].id).toBe("uniq");
+  });
+});
+
+describe("getTodoIntegrityIssues", () => {
+  it("reports missing and duplicate stable IDs", () => {
+    expect(getTodoIntegrityIssues([
+      sample({ id: "dup" }),
+      sample({ id: "dup", content: "Other" }),
+      sample({ content: "Legacy" }),
+    ])).toEqual([
+      'todos[1].id "dup" is duplicated',
+      "todos[2] has no stable ID",
+    ]);
   });
 });

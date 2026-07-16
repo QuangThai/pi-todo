@@ -29,5 +29,7 @@ export const WIDGET_KEY = "pi-todo";
 export const MAX_OVERLAY_LINES = 12;
 /** Max characters per todo content after sanitize (context/tool safety). */
 export const MAX_CONTENT_LENGTH = 500;
+/** Bound mutation payloads and persisted snapshots to keep tool context manageable. */
+export const MAX_TODO_ITEMS = 200;
 /** Max todo lines echoed in todowrite/todoread text (full list still in details/JSON). */
 export const MAX_RESULT_LINES = 40;

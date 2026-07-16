@@ -46,12 +46,18 @@ Rules enforced by the tool:
 - `content` required (non-empty after sanitize); max **500** chars (longer values truncated)
 - `priority` required: `high` | `medium` | `low`
 - Status: `pending` | `in_progress` | `completed` | `cancelled`
+- **ID rule:** omit `id` for a new item; the system assigns it. Only include an ID returned by `todo_read` when retaining an existing item. Never invent an ID. Replacing the list does not inherently reset IDs: matching existing items can retain them.
+- For changed, repeated, or long/truncated content, include the exact existing ID rather than relying on automatic content matching.
+- Do not call `todo_write` and a `todo_update` that needs its IDs in the same parallel batch. Wait for the write result, then use returned IDs or call `todo_read`.
+- A mutation can contain at most **200** todos/updates.
 - Array order is the workflow timeline. Keep existing positions when statuses change; only add or reorder items intentionally.
 - Tool text echo caps at **40** lines (`+N more` in the text body; full list still in `details` / JSON)
 
 ### `todo_update`
 
-Patch existing todos by stable ID without replacing the list or changing its order. Use `todo_read` first to obtain IDs; this tool never deletes items.
+Patch existing todos by stable ID without replacing the list or changing its order. `id` is required, must be a non-empty string, and must match a current todo; use `todo_read` first to obtain it. This tool never deletes items.
+
+If an older session returns a todo without `id`, it cannot be patched with `todo_update`. Call `todo_write` with that item but omit `id` to assign one, then use `todo_update` normally.
 
 ```json
 {
@@ -67,7 +73,7 @@ Returns the current list as text + JSON. Prefer the overlay for at-a-glance stat
 
 ### `todo_diagnose`
 
-Read-only persistence check for suspected reload, tree-navigation, or compaction drift. It compares the live in-memory snapshot against a replay of the durable session branch and reports `consistent` or `mismatch`; it never changes todos.
+Read-only persistence check for suspected reload, tree-navigation, or compaction drift. It compares the live in-memory snapshot against a replay of the durable session branch and reports `consistent`, `mismatch`, or `repair_needed` when duplicate/missing IDs are found; it never changes todos.
 
 ## Overlay
 

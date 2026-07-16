@@ -31,4 +31,13 @@ describe("prompt guidance", () => {
     expect(TODOWRITE_GUIDELINES.join("\n")).toContain("todo_update");
     expect(TASK_MANAGEMENT_SECTION).toContain("todo_update");
   });
+
+  it("documents ID rules for new writes and targeted updates", () => {
+    const guidance = `${TODOWRITE_DESCRIPTION}\n${TODOWRITE_GUIDELINES.join("\n")}\n${TASK_MANAGEMENT_SECTION}`;
+    expect(guidance).toMatch(/omit .*id.*new item/i);
+    expect(guidance).toMatch(/todo_update.*id.*required/i);
+    expect(guidance).toMatch(/never invent/i);
+    expect(guidance).toMatch(/same parallel batch/i);
+    expect(guidance).toMatch(/legacy item without id/i);
+  });
 });

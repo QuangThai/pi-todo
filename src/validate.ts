@@ -1,7 +1,7 @@
 import { sanitizeTodoText } from "./sanitize.js";
 import { randomUUID } from "node:crypto";
 import type { TodoItem, TodoPriority, TodoStatus } from "./types.js";
-import { MAX_CONTENT_LENGTH, TODO_PRIORITIES, TODO_STATUSES } from "./types.js";
+import { MAX_CONTENT_LENGTH, MAX_TODO_ITEMS, TODO_PRIORITIES, TODO_STATUSES } from "./types.js";
 
 export type ValidateOk = { ok: true; todos: TodoItem[]; unchanged: boolean };
 export type ValidateErr = { ok: false; error: string };
@@ -33,6 +33,9 @@ export function validateTodoWrite(
 ): ValidateResult {
   if (!Array.isArray(rawTodos)) {
     return { ok: false, error: "todos must be an array" };
+  }
+  if (rawTodos.length > MAX_TODO_ITEMS) {
+    return { ok: false, error: `todos must contain at most ${MAX_TODO_ITEMS} items` };
   }
 
   const todos: TodoItem[] = [];
@@ -110,11 +113,16 @@ export function validateTodoWrite(
  *
  * - Items with an explicit `id` keep it (must already exist in `current`, verified
  *   by `validateTodoWrite`).
+ * - Explicit IDs are reserved before matching so an id-less item cannot claim
+ *   an ID that another incoming item explicitly preserves.
  * - Items without `id` try to match a prior item: first by full tuple
  *   (content+status+priority), then by unique content.  If ambiguous (multiple
  *   same-content items) or no prior match, a new UUID is generated.
  */
 export function ensureTodoIds(todos: readonly TodoItem[], current: readonly TodoItem[]): TodoItem[] {
+  // Reserve every explicit ID up front. Incoming order must not decide whether an
+  // id-less item steals an ID that a later item explicitly retains.
+  const reserved = new Set(todos.flatMap((todo) => todo.id ? [todo.id] : []));
   const claimed = new Set<string>();
 
   // Pre-index content uniqueness: content that appears only once in `current`
@@ -129,7 +137,7 @@ export function ensureTodoIds(todos: readonly TodoItem[], current: readonly Todo
     if (!id) {
       // 1. Exact tuple match (content + status + priority)
       const byTuple = current.find(
-        (c) => !!c.id && !claimed.has(c.id) &&
+          (c) => !!c.id && !reserved.has(c.id) && !claimed.has(c.id) &&
           c.content === todo.content &&
           c.status === todo.status &&
           c.priority === todo.priority,
@@ -141,22 +149,43 @@ export function ensureTodoIds(todos: readonly TodoItem[], current: readonly Todo
         const count = contentCounts.get(todo.content) ?? 0;
         if (count === 1) {
           const byContent = current.find(
-            (c) => !!c.id && !claimed.has(c.id) && c.content === todo.content,
+              (c) => !!c.id && !reserved.has(c.id) && !claimed.has(c.id) && c.content === todo.content,
           );
           if (byContent) id = byContent.id;
         }
       }
       // 3. No match or ambiguous → fresh ID
-      if (!id) id = randomUUID();
+        if (!id) {
+          do id = randomUUID(); while (reserved.has(id) || claimed.has(id));
+        }
     }
     claimed.add(id);
     return { ...todo, id };
   });
 }
 
+/** Report persisted-state identity problems without mutating legacy snapshots. */
+export function getTodoIntegrityIssues(todos: readonly TodoItem[]): string[] {
+  const issues: string[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < todos.length; i++) {
+    const id = todos[i].id;
+    if (typeof id !== "string" || !id.trim()) {
+      issues.push(`todos[${i}] has no stable ID`);
+      continue;
+    }
+    if (seen.has(id)) issues.push(`todos[${i}].id "${id}" is duplicated`);
+    seen.add(id);
+  }
+  return issues;
+}
+
 export function validateTodoUpdate(rawUpdates: unknown, current: readonly TodoItem[]): ValidateResult {
   if (!Array.isArray(rawUpdates) || rawUpdates.length === 0) {
     return { ok: false, error: "updates must be a non-empty array" };
+  }
+  if (rawUpdates.length > MAX_TODO_ITEMS) {
+    return { ok: false, error: `updates must contain at most ${MAX_TODO_ITEMS} items` };
   }
   const next = current.map((todo) => ({ ...todo }));
   const seen = new Set<string>();
