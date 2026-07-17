@@ -19,7 +19,8 @@ export function getTodoMarker(status: TodoStatus): string {
 }
 
 export function formatPlainTodoLine(todo: TodoItem): string {
-  return `${getTodoMarker(todo.status)} ${todo.content}`;
+  const prefix = todo.id ? `${todo.id} ` : "";
+  return `${getTodoMarker(todo.status)} ${prefix}${todo.content}`;
 }
 
 /** Compact checklist for tool responses; caps lines to keep LLM context small. */

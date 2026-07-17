@@ -1,16 +1,18 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
+import { formatTodoListText } from "../format.js";
 import { TodoUpdateParams } from "../schema.js";
 import { getTodos, setTodos, withStoreLock } from "../store.js";
 import type { TodoWriteDetails } from "../types.js";
 import { TODO_STATE_ENTRY_TYPE, TOOL_UPDATE } from "../types.js";
-import { ensureTodoIds, validateTodoUpdate } from "../validate.js";
+import { countOpenTodos, ensureTodoIds, validateTodoUpdate } from "../validate.js";
 
 export function registerTodoUpdateTool(pi: ExtensionAPI, options: { onCommit?: () => void }): void {
   pi.registerTool({
     name: TOOL_UPDATE,
     label: "Todo Update",
-    description: "Patch existing todos by stable ID. Use todo_read first to obtain IDs. This never deletes items.",
+    description: "Patch existing todos by stable ID without replacing the full list or changing its order. id is required, must be a non-empty string, and must match a current todo; use todo_read first to obtain it. This tool never deletes items.\n\nNote: todo_write can reassign IDs for items whose content/status/priority changed. Always call todo_read before todo_update to get the current IDs.",
+    promptGuidelines: ["Always call todo_read before todo_update to obtain current IDs; IDs can change after todo_write if the item\u2019s content, status, or priority was modified."],
     promptSnippet: "Patch one or more existing todos by ID without replacing the full list",
     parameters: TodoUpdateParams,
     async execute(_toolCallId, params) {
@@ -30,7 +32,11 @@ export function registerTodoUpdateTool(pi: ExtensionAPI, options: { onCommit?: (
         }
         setTodos(todos);
         options.onCommit?.();
-        return { content: [{ type: "text", text: result.unchanged ? "No change" : `Updated ${params.updates.length} todo(s)` }], details: { todos, ...(result.unchanged ? { unchanged: true } : {}) } as TodoWriteDetails };
+        const open = countOpenTodos(todos);
+        const text = result.unchanged
+          ? "No change"
+          : `Updated ${params.updates.length} todo(s)\n\n${formatTodoListText(todos, `${open} open / ${todos.length} total`)}`;
+        return { content: [{ type: "text", text }], details: { todos, ...(result.unchanged ? { unchanged: true } : {}) } as TodoWriteDetails };
       });
     },
     renderCall(args, theme) { return new Text(theme.fg("toolTitle", theme.bold("todo_update ")) + theme.fg("accent", `${Array.isArray(args.updates) ? args.updates.length : 0} patch(es)`), 0, 0); },
