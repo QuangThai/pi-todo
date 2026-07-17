@@ -228,7 +228,7 @@ describe("ensureTodoIds", () => {
     expect(new Set(result.map((todo) => todo.id)).size).toBe(result.length);
   });
 
-  it("generates fresh IDs for duplicate content items (ambiguous)", () => {
+  it("generates fresh short IDs for duplicate content items (ambiguous)", () => {
     const current = [
       { id: "a1", content: "Same", status: "pending" as const, priority: "high" as const },
       { id: "a2", content: "Same", status: "pending" as const, priority: "high" as const },
@@ -237,9 +237,29 @@ describe("ensureTodoIds", () => {
       { content: "Same", status: "completed" as const, priority: "high" as const },  // tuple doesn't match
     ];
     const result = ensureTodoIds(incoming, current);
-    // Content is not unique in current → should get fresh UUID, not borrow
+    // Content is not unique in current → should get fresh short ID, not borrow
     expect(result[0].id).not.toBe("a1");
     expect(result[0].id).not.toBe("a2");
+    expect(result[0].id).toMatch(/^t\d+$/);
+  });
+
+  it("assigns sequential short IDs t1, t2, … for new items", () => {
+    const result = ensureTodoIds(
+      [
+        { content: "A", status: "pending" as const, priority: "high" as const },
+        { content: "B", status: "pending" as const, priority: "low" as const },
+      ],
+      [],
+    );
+    expect(result.map((t) => t.id)).toEqual(["t1", "t2"]);
+  });
+
+  it("skips already-used short IDs when assigning new ones", () => {
+    const result = ensureTodoIds(
+      [{ content: "New", status: "pending" as const, priority: "medium" as const }],
+      [{ id: "t1", content: "Old", status: "completed" as const, priority: "low" as const }],
+    );
+    expect(result[0].id).toBe("t2");
   });
 
   it("content-only fallback only when content is unique in current", () => {

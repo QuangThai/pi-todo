@@ -46,7 +46,7 @@ Rules enforced by the tool:
 - `content` required (non-empty after sanitize); max **500** chars (longer values truncated)
 - `priority` required: `high` | `medium` | `low`
 - Status: `pending` | `in_progress` | `completed` | `cancelled`
-- **ID rule:** omit `id` for a new item; the system assigns it. Only include an ID returned by `todo_read` when retaining an existing item. Never invent an ID. Replacing the list does not inherently reset IDs: matching existing items can retain them.
+- **ID rule:** omit `id` for a new item; the system assigns a short sequential ID (`t1`, `t2`, …). Only include an ID returned by `todo_read` when retaining an existing item. Never invent an ID. Replacing the list does not inherently reset IDs: matching existing items can retain them.
 - For changed, repeated, or long/truncated content, include the exact existing ID rather than relying on automatic content matching.
 - Do not call `todo_write` and a `todo_update` that needs its IDs in the same parallel batch. Wait for the write result, then use returned IDs or call `todo_read`.
 - A mutation can contain at most **200** todos/updates.
@@ -55,14 +55,14 @@ Rules enforced by the tool:
 
 ### `todo_update`
 
-Patch existing todos by stable ID without replacing the list or changing its order. `id` is required, must be a non-empty string, and must match a current todo; use `todo_read` first to obtain it. This tool never deletes items.
+Patch existing todos by short stable ID (`t1`, `t2`, …) without replacing the list or changing its order. `id` is required, must be a non-empty string, and must match a current todo exactly; use `todo_read` (or the IDs shown in the last write/update text) first. This tool never deletes items.
 
 If an older session returns a todo without `id`, it cannot be patched with `todo_update`. Call `todo_write` with that item but omit `id` to assign one, then use `todo_update` normally.
 
 ```json
 {
   "updates": [
-    { "id": "existing-todo-id", "status": "completed" }
+    { "id": "t1", "status": "completed" }
   ]
 }
 ```

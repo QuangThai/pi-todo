@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.5 (2026-07-17)
+
+### Fixed
+
+- **Root cause of intermittent `todo_update` ID errors**: LLMs frequently
+  mistype 36-char UUIDs even when IDs are visible in tool output. New todos
+  now get short sequential IDs (`t1`, `t2`, …) that are trivial to copy.
+- **Clearer mismatch errors**: `todo_update` lists current IDs when a patch
+  targets an unknown ID, so the model can self-correct without guessing.
+- Legacy UUID IDs in existing sessions remain valid; only newly assigned IDs
+  use the short format.
+
+## 0.3.4 (2026-07-17)
+
+### Fixed
+
+- **IDs visible in tool text**: `formatPlainTodoLine` and `todo_update` results
+  now include stable IDs so models can copy them for follow-up patches.
+- **`todo_update` guidance**: Description warns that IDs can change after
+  `todo_write`; always `todo_read` before patching when unsure.
+
 ## 0.3.3 (2026-07-16)
 
 ### Changed

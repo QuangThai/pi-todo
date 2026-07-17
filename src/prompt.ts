@@ -32,7 +32,7 @@ Do **not** skip just because the request is "explain" or "review" — if the ans
 ## Rules
 
 - Each call **REPLACES** the entire list (full replace). Always pass the complete todos array.
-  - **ID rule:** omit \`id\` for every new item — the system assigns it. Only preserve an \`id\` returned by \`todo_read\` for an item that already exists; never invent an ID. For changed, repeated, or long/truncated content, preserve the exact existing ID instead of relying on content matching. Full replacement does not inherently reset IDs: matching existing items can retain them.
+  - **ID rule:** omit \`id\` for every new item — the system assigns a short ID (\`t1\`, \`t2\`, …). Only preserve an \`id\` returned by \`todo_read\` for an item that already exists; never invent an ID. For changed, repeated, or long/truncated content, preserve the exact existing ID instead of relying on content matching. Full replacement does not inherently reset IDs: matching existing items can retain them.
   - Do not call \`todo_write\` and a dependent \`todo_update\` in the same parallel batch. Complete the write, then use its returned IDs (or \`todo_read\`) for the update.
 - Update status in real time; don't batch completions across multiple finished steps.
 - Mark \`completed\` only after the work is actually done (including verification) — never on intent alone.
@@ -53,7 +53,7 @@ export const TODODIAGNOSE_DESCRIPTION =
 export const TODOWRITE_GUIDELINES = [
   "For multi-step work (3+ steps), codebase explain/explore/review, or when the user gives a list of tasks, call todo_write BEFORE starting — do not skip tracking.",
   "Pass the full list every todo_write call (full replace). Keep exactly one todo in_progress; mark completed immediately when a step finishes — never leave a stale in_progress.",
-  "ID rule: for todo_write, omit id for new items so the system assigns one. Supply an id only to preserve an existing item, using the exact ID from todo_read; never invent IDs. For changed, repeated, or long/truncated content, preserve that exact ID rather than relying on content matching. For todo_update, id is required and must match a current todo.",
+  "ID rule: for todo_write, omit id for new items so the system assigns a short ID (t1, t2, …). Supply an id only to preserve an existing item, using the exact ID from todo_read; never invent IDs. For changed, repeated, or long/truncated content, preserve that exact ID rather than relying on content matching. For todo_update, id is required and must match a current todo.",
   "Never call todo_write and a todo_update that depends on its IDs in the same parallel batch. Wait for todo_write to finish, then use its returned IDs or call todo_read. If todo_read shows a legacy item without id, rewrite it with todo_write and omit id to assign one before using todo_update.",
   "When finishing a step or when the user confirms done, use todo_update for an ID-based patch when possible; use todo_write only when replacing the full checklist. Advance the next pending item in the same mutation if work continues.",
   "Treat todo array order as the workflow timeline: preserve positions when updating statuses, and only add or reorder items intentionally.",
@@ -68,7 +68,7 @@ export const TODOWRITE_GUIDELINES = [
  */
 export const TASK_MANAGEMENT_SECTION = `
 <Task_Management>
-todo_write/todo_update/todo_read are the coordination layer for multi-step work. Use todo_write for the initial/full checklist and todo_update for a targeted patch by stable ID. In todo_write, omit id for new items; only retain an exact ID returned by todo_read for an existing item. In todo_update, id is required and must match a current todo. Do not call a write and an update that depends on its IDs in the same parallel batch: wait for the write result first. The TUI overlay only appears after a todo mutation — without it the user cannot see plan/progress.
+todo_write/todo_update/todo_read are the coordination layer for multi-step work. Use todo_write for the initial/full checklist and todo_update for a targeted patch by stable ID. In todo_write, omit id for new items (system assigns t1, t2, …); only retain an exact ID returned by todo_read for an existing item. In todo_update, id is required and must match a current todo. Do not call a write and an update that depends on its IDs in the same parallel batch: wait for the write result first. The TUI overlay only appears after a todo mutation — without it the user cannot see plan/progress.
 
 Required cold start: for explain/explore/review/implement/refactor/audit/debug/fix/polish/setup of a codebase, feature, UI, or multi-file ask — your FIRST tool call must be todo_write with a short checklist (WHAT/WHERE), exactly one in_progress, then continue. Do not start with read/bash/search alone on those asks.
 

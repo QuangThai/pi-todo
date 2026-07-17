@@ -11,8 +11,14 @@ export function registerTodoUpdateTool(pi: ExtensionAPI, options: { onCommit?: (
   pi.registerTool({
     name: TOOL_UPDATE,
     label: "Todo Update",
-    description: "Patch existing todos by stable ID without replacing the full list or changing its order. id is required, must be a non-empty string, and must match a current todo; use todo_read first to obtain it. This tool never deletes items.\n\nNote: todo_write can reassign IDs for items whose content/status/priority changed. Always call todo_read before todo_update to get the current IDs.",
-    promptGuidelines: ["Always call todo_read before todo_update to obtain current IDs; IDs can change after todo_write if the item\u2019s content, status, or priority was modified."],
+    description:
+      "Patch existing todos by short stable ID (t1, t2, …) without replacing the full list. " +
+      "id is required and must match a current todo exactly — copy it from todo_read / the previous tool result; " +
+      "never invent or approximate an ID. This tool never deletes items.\n\n" +
+      "Note: always call todo_read (or use IDs from the last write/update text) before todo_update.",
+    promptGuidelines: [
+      "Copy the exact short ID (t1, t2, …) from todo_read or the last todo_write/todo_update text. Never invent, truncate, or approximate IDs.",
+    ],
     promptSnippet: "Patch one or more existing todos by ID without replacing the full list",
     parameters: TodoUpdateParams,
     async execute(_toolCallId, params) {

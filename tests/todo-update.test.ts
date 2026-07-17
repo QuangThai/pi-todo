@@ -47,7 +47,13 @@ describe("todo_update validation", () => {
   });
 
   it("rejects unknown and duplicate IDs", () => {
-    expect(validateTodoUpdate([{ id: "missing", status: "completed" }], current).ok).toBe(false);
+    const missing = validateTodoUpdate([{ id: "missing", status: "completed" }], current);
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) {
+      expect(missing.error).toMatch(/does not match an existing todo/);
+      expect(missing.error).toContain("current IDs:");
+      expect(missing.error).toContain(current[0].id!);
+    }
     expect(validateTodoUpdate([{ id: current[0].id, status: "completed" }, { id: current[0].id, priority: "low" }], current).ok).toBe(false);
   });
 });

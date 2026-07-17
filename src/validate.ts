@@ -1,7 +1,19 @@
 import { sanitizeTodoText } from "./sanitize.js";
-import { randomUUID } from "node:crypto";
 import type { TodoItem, TodoPriority, TodoStatus } from "./types.js";
 import { MAX_CONTENT_LENGTH, MAX_TODO_ITEMS, TODO_PRIORITIES, TODO_STATUSES } from "./types.js";
+
+/** Short sequential IDs (`t1`, `t2`, …) — easy for LLMs to copy; avoids UUID typos. */
+export function nextShortTodoId(used: ReadonlySet<string>): string {
+  let n = 1;
+  while (used.has(`t${n}`)) n += 1;
+  return `t${n}`;
+}
+
+function formatAvailableIds(current: readonly TodoItem[]): string {
+  const ids = current.map((t) => t.id).filter((id): id is string => typeof id === "string" && id.length > 0);
+  if (ids.length === 0) return "(none)";
+  return ids.join(", ");
+}
 
 export type ValidateOk = { ok: true; todos: TodoItem[]; unchanged: boolean };
 export type ValidateErr = { ok: false; error: string };
@@ -117,13 +129,16 @@ export function validateTodoWrite(
  *   an ID that another incoming item explicitly preserves.
  * - Items without `id` try to match a prior item: first by full tuple
  *   (content+status+priority), then by unique content.  If ambiguous (multiple
- *   same-content items) or no prior match, a new UUID is generated.
+ *   same-content items) or no prior match, a new short ID (`tN`) is generated.
  */
 export function ensureTodoIds(todos: readonly TodoItem[], current: readonly TodoItem[]): TodoItem[] {
   // Reserve every explicit ID up front. Incoming order must not decide whether an
   // id-less item steals an ID that a later item explicitly retains.
   const reserved = new Set(todos.flatMap((todo) => todo.id ? [todo.id] : []));
   const claimed = new Set<string>();
+  // Avoid reusing any current ID in this pass — a later id-less item may still
+  // match it by tuple/content. Freed IDs become reusable on the next write.
+  const currentIds = new Set(current.flatMap((todo) => todo.id ? [todo.id] : []));
 
   // Pre-index content uniqueness: content that appears only once in `current`
   // is safe for content-only fallback.
@@ -154,10 +169,11 @@ export function ensureTodoIds(todos: readonly TodoItem[], current: readonly Todo
           if (byContent) id = byContent.id;
         }
       }
-      // 3. No match or ambiguous → fresh ID
-        if (!id) {
-          do id = randomUUID(); while (reserved.has(id) || claimed.has(id));
-        }
+      // 3. No match or ambiguous → fresh short sequential ID
+      if (!id) {
+        const used = new Set([...reserved, ...claimed, ...currentIds]);
+        id = nextShortTodoId(used);
+      }
     }
     claimed.add(id);
     return { ...todo, id };
@@ -197,7 +213,12 @@ export function validateTodoUpdate(rawUpdates: unknown, current: readonly TodoIt
     if (seen.has(rec.id)) return { ok: false, error: `updates[${i}].id is duplicated` };
     seen.add(rec.id);
     const target = next.find((todo) => todo.id === rec.id);
-    if (!target) return { ok: false, error: `updates[${i}].id does not match an existing todo` };
+    if (!target) {
+      return {
+        ok: false,
+        error: `updates[${i}].id "${rec.id}" does not match an existing todo; current IDs: ${formatAvailableIds(current)}`,
+      };
+    }
     if (rec.content === undefined && rec.status === undefined && rec.priority === undefined) {
       return { ok: false, error: `updates[${i}] must change content, status, or priority` };
     }
