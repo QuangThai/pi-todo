@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.4.0 (2026-07-20)
+
+### Fixed
+
+- **Prompt policy over-injection**: removed forced "FIRST tool call must be
+  todo_write" language from system prompt and tool description. The model is
+  no longer required to call todo_write for explain/review/audit/debug/setup
+  unless the request is genuinely multi-step.
+
+### Changed
+
+- **Heuristic thresholds tightened**: increased minimum lengths for
+  verb-based, help-ask, sequenced-clause, substantive-length, and
+  multi-sentence classification to reduce false-positive cold-start nudges.
+- **LIST_MARKERS now requires ≥2 items**: a single bullet or numbered item
+  no longer triggers multi-step classification.
+- **EXPLICIT_TODO now requires ≥24 characters**: a short "todo" mention
+  without planning context is no longer classified as multi-step.
+- **Cold-start language softened**: "Call todo_write NOW" → "consider creating
+  a todo list". Reminder no longer says "Do not answer without a todo list first".
+- **Conditional system-prompt injection**: `TASK_MANAGEMENT_SECTION` is only
+  injected when the prompt is not trivial, reducing token overhead on simple
+  queries.
+
 ## 0.3.5 (2026-07-17)
 
 ### Fixed
