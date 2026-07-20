@@ -6,25 +6,25 @@ import {
 } from "../src/prompt.js";
 
 describe("prompt guidance", () => {
-  it("TASK_MANAGEMENT_SECTION nudges cold-start todo_write for explain/explore", () => {
+  it("TASK_MANAGEMENT_SECTION guides multi-step planning without forcing", () => {
     expect(TASK_MANAGEMENT_SECTION).toContain("todo_write");
-    expect(TASK_MANAGEMENT_SECTION).toMatch(/explain\/explore\/review/i);
-    expect(TASK_MANAGEMENT_SECTION).toMatch(/FIRST tool call must be todo_write/i);
-    expect(TASK_MANAGEMENT_SECTION).toMatch(/giải thích|chỉnh|bổ sung/i);
+    expect(TASK_MANAGEMENT_SECTION).toMatch(/genuinely multi-step/i);
+    expect(TASK_MANAGEMENT_SECTION).toMatch(/skip planning and proceed directly/i);
+    expect(TASK_MANAGEMENT_SECTION).not.toMatch(/FIRST tool call must/i);
   });
 
-  it("COLD_START_BOOST is present for prompt-aware path", async () => {
+  it("COLD_START_BOOST suggests rather than commands", async () => {
     const { COLD_START_BOOST } = await import("../src/prompt.js");
-    expect(COLD_START_BOOST).toContain("COLD START ACTIVE");
-    expect(COLD_START_BOOST).toContain("Call todo_write before any other tool");
+    expect(COLD_START_BOOST).toContain("consider creating a todo list");
+    expect(COLD_START_BOOST).not.toContain("Call todo_write before any other tool");
   });
 
-  it("tool description treats multi-step explain as when-to-use, not skip", () => {
-    expect(TODOWRITE_DESCRIPTION).toContain("Explain / explore / review");
-    expect(TODOWRITE_DESCRIPTION).toContain(
-      'Do **not** skip just because the request is "explain" or "review"',
-    );
-    expect(TODOWRITE_GUIDELINES[0]).toMatch(/explain\/explore\/review/i);
+  it("tool description lists appropriate use cases without forcing", () => {
+    expect(TODOWRITE_DESCRIPTION).toContain("Good candidates for todo tracking");
+    expect(TODOWRITE_DESCRIPTION).toContain("3+ distinct steps");
+    expect(TODOWRITE_DESCRIPTION).toContain("explicitly asks for planning");
+    expect(TODOWRITE_DESCRIPTION).toContain("simple even if it uses words like \"explain\"");
+    expect(TODOWRITE_GUIDELINES[0]).toMatch(/todo_write helps track progress/i);
   });
 
   it("documents todo_update as the ID-based patch tool", () => {

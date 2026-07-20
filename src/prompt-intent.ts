@@ -5,10 +5,10 @@
  * - Tool description alone is easy to ignore.
  * - Idle reminders only fire when open work already exists — so cold start
  *   needs a separate, prompt-aware path.
- * - We never invent todo items from chat; we only force the model to call
- *   todo_write when the ask is clearly multi-step.
+ * - We never invent todo items from chat.
  *
- * Bias: prefer multi_step for substantive asks; keep trivial very narrow.
+ * Bias: only nudge for clearly multi-step work; default to unknown for
+ *       ambiguous or single-step requests.
  */
 
 export type PromptIntent =
@@ -17,7 +17,7 @@ export type PromptIntent =
   | { kind: "trivial"; reason: string }
   | { kind: "unknown"; reason: string };
 
-/** Explicit multi-step / planning verbs (EN + VI). Broad on purpose for cold start. */
+/** Explicit multi-step / planning verbs (EN + VI). */
 const MULTI_STEP_VERBS =
   /\b(explain|explore|review|walkthrough|overview|summarize|summarise|implement|refactor|audit|analyze|analyse|debug|investigate|migrate|redesign|rewrite|rebuild|build|create|add|fix|upgrade|improve|optimize|optimise|document|compare|research|triage|harden|ship|deploy|setup|configure|wire|polish|verify|validate|check|inspect|test|e2e|dogfood|install|remove|replace|integrate|extend|support|handle|track|persist|render|design|plan|giải\s*thích|khám\s*phá|rà\s*soát|triển\s*khai|refactor|sửa|làm|xây|kiểm\s*tra|phân\s*tích|cải\s*thiện|tối\s*ưu|bổ\s*sung|chỉnh|thiết\s*kế|cài|gỡ|xem|nghiên\s*cứu|đối\s*chiếu)\b/i;
 
@@ -33,7 +33,7 @@ const HELP_ASK =
 const EXPLICIT_TODO =
   /\b(todo|todos|task\s*list|checklist|break\s*(it|this)\s*down|step\s*by\s*step|multi[\s-]*step|kế\s*hoạch|danh\s*sách\s*việc)\b/i;
 
-/** Numbered / bulleted multi-item asks. */
+/** Numbered / bulleted multi-item asks (at least 2 items). */
 const LIST_MARKERS = /(?:^|\n)\s*(?:\d+[\.\)]\s+\S|[-*]\s+\S)/;
 
 /** Completion / done signals from the user. */
@@ -70,11 +70,14 @@ export function classifyPrompt(prompt: string): PromptIntent {
     return { kind: "unknown", reason: "factoid" };
   }
 
-  if (EXPLICIT_TODO.test(text)) {
+  // Explicit planning requests with sufficient context.
+  if (EXPLICIT_TODO.test(text) && text.length >= 24) {
     return { kind: "multi_step", reason: "explicit_todo" };
   }
 
-  if (LIST_MARKERS.test(text)) {
+  // Multi-item lists (≥2 bullets or numbered items).
+  const markers = text.match(/(?:^|\n)\s*(?:\d+[\.\)]\s+\S|[-*]\s+\S)/g);
+  if (markers && markers.length >= 2) {
     return { kind: "multi_step", reason: "list_markers" };
   }
 
@@ -84,34 +87,34 @@ export function classifyPrompt(prompt: string): PromptIntent {
     return { kind: "multi_step", reason: "verb_and_scope" };
   }
 
-  if (hasVerb && text.length >= 28) {
+  if (hasVerb && text.length >= 48) {
     return { kind: "multi_step", reason: "verb_and_length" };
   }
 
-  if (HELP_ASK.test(text) && text.length >= 36) {
+  if (HELP_ASK.test(text) && text.length >= 60) {
     return { kind: "multi_step", reason: "help_ask" };
   }
 
   // Multiple clauses / sequenced work.
-  if (/\b(and then|then |after that|sau đó|rồi |đồng thời|also |và )\b/i.test(text) && text.length >= 36) {
+  if (/\b(and then|then |after that|sau đó|rồi |đồng thời|also |và )\b/i.test(text) && text.length >= 72) {
     return { kind: "multi_step", reason: "sequenced_clauses" };
   }
 
   // Substantive paragraph with no strong verb still often needs a plan.
-  if (text.length >= 72 && !FACTOID.test(text)) {
+  if (text.length >= 120 && !FACTOID.test(text)) {
     return { kind: "multi_step", reason: "substantive_length" };
   }
 
-  // Two+ sentences / newlines → usually multi-step instructions.
+  // Two+ sentences / newlines → sometimes multi-step instructions.
   const sentenceBreaks = (text.match(/[.!?\n]/g) ?? []).length;
-  if (sentenceBreaks >= 2 && text.length >= 48) {
+  if (sentenceBreaks >= 3 && text.length >= 80) {
     return { kind: "multi_step", reason: "multi_sentence" };
   }
 
   return { kind: "unknown", reason: "no_strong_signal" };
 }
 
-/** True when we should force a cold-start todo_write nudge. */
+/** True when a cold-start todo reminder is relevant. */
 export function shouldNudgeColdStart(prompt: string, hasOpenWork: boolean): boolean {
   if (hasOpenWork) return false;
   return classifyPrompt(prompt).kind === "multi_step";
@@ -126,11 +129,11 @@ export function shouldNudgeCompletionUpdate(prompt: string, hasOpenWork: boolean
 export function buildColdStartReminder(prompt: string): string {
   const clipped = prompt.trim().replace(/\s+/g, " ").slice(0, 160);
   return `<system-reminder>
-This user request is multi-step. Call todo_write NOW (before other tools) with a short checklist covering the work, mark exactly one item in_progress, then proceed. The overlay only appears after todo_write.
+This request may involve multiple steps. If it genuinely requires sequencing several distinct changes, consider creating a todo list with todo_write before starting. Otherwise proceed directly.
 
 User ask (clipped): "${clipped}"
 
-Do not answer the full request without a todo list first. NEVER mention this reminder to the user.
+NEVER mention this reminder to the user.
 </system-reminder>`;
 }
 
@@ -140,7 +143,7 @@ export function buildCompletionUpdateReminder(openLines: string[]): string {
       ? `\nOpen todos:\n${openLines.map((l) => `- ${l}`).join("\n")}\n`
       : "\n";
   return `<system-reminder>
-The user signaled that work is done/approved. Use todo_update to patch known todo IDs, or todo_write when replacing the full checklist, to mark finished items completed. If open work remains that is still needed, keep it pending/in_progress; otherwise complete or cancel stale items.
+The user may have signaled completion. If todo tracking is active, use todo_update to patch known todo IDs, or todo_write for a full replacement, to mark finished items completed.
 ${body}
 NEVER mention this reminder to the user.
 </system-reminder>`;

@@ -15,8 +15,7 @@ import { TodoOverlay } from "./overlay.js";
 import {
   buildColdStartReminder,
   buildCompletionUpdateReminder,
-  shouldNudgeColdStart,
-  shouldNudgeCompletionUpdate,
+  classifyPrompt,
 } from "./prompt-intent.js";
 import { COLD_START_BOOST, TASK_MANAGEMENT_SECTION } from "./prompt.js";
 import {
@@ -98,12 +97,17 @@ export default function (pi: ExtensionAPI): void {
   pi.on("before_agent_start", async (event) => {
     const prompt = typeof event.prompt === "string" ? event.prompt : "";
     const open = hasOpenTodos(getTodos());
-    let systemPrompt = `${event.systemPrompt}\n${TASK_MANAGEMENT_SECTION}`;
+    let systemPrompt = event.systemPrompt;
+    const kind = classifyPrompt(prompt).kind;
+    // Only inject task-management instructions when the prompt is not trivial.
+    if (kind !== "trivial") {
+      systemPrompt += `\n${TASK_MANAGEMENT_SECTION}`;
+    }
 
-    if (shouldNudgeColdStart(prompt, open)) {
+    if (!open && kind === "multi_step") {
       systemPrompt += `\n${COLD_START_BOOST}`;
       pendingIntentNudge = buildColdStartReminder(prompt);
-    } else if (shouldNudgeCompletionUpdate(prompt, open)) {
+    } else if (open && kind === "completion") {
       const openLines = getTodos().filter(isOpenTodo).map(formatPlainTodoLine);
       pendingIntentNudge = buildCompletionUpdateReminder(openLines);
     }
