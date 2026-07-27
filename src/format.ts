@@ -49,7 +49,7 @@ export function formatThemedTodoLine(todo: TodoItem, theme: Theme): string {
     return `${theme.fg("warning", marker)} ${theme.fg("warning", todo.content)}`;
   }
   if (todo.status === "completed" || todo.status === "cancelled") {
-    return `${theme.fg("dim", marker)} ${theme.fg("dim", todo.content)}`;
+    return `${theme.fg("dim", marker)} ${theme.fg("dim", theme.strikethrough(todo.content))}`;
   }
   return `${theme.fg("muted", marker)} ${theme.fg("muted", todo.content)}`;
 }
@@ -126,7 +126,7 @@ export function renderOverlayLines(
   const completed = countCompletedTodos(todos);
   const heading = truncate(
     theme.fg("accent", theme.bold("# Todos")) +
-      theme.fg("dim", ` (${open} open, ${running} running, ${completed} completed)`),
+      theme.fg("dim", ` (${open} open, ${running} running, ${completed} done)`),
   );
 
   // Small gap between heading and first row — budget -1 to account for the blank line

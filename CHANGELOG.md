@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.0 (2026-07-27)
+
+### Added
+
+- **Strikethrough for completed/cancelled items**: completed and cancelled
+  todo items now render with strikethrough styling in the TUI overlay via
+  `theme.strikethrough()`.
+
+### Changed
+
+- **Overlay heading label**: `"completed"` → `"done"` in the status line
+  (e.g., `# Todos (4 open, 1 running, 3 done)`).
+
 ## 0.4.0 (2026-07-20)
 
 ### Fixed

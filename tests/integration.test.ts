@@ -136,7 +136,7 @@ describe("validate→store→format integration", () => {
     ]);
 
     const lines = renderOverlayLines(getTodos(), identityTheme, 80);
-    expect(lines[0]).toBe("# Todos (2 open, 1 running, 1 completed)");
+    expect(lines[0]).toBe("# Todos (2 open, 1 running, 1 done)");
     expect(lines).toContain("[•] active");
     expect(lines).toContain("[ ] next");
   });
