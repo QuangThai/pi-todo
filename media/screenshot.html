@@ -80,7 +80,7 @@
     .title { letter-spacing: 0.01em; }
 
     .content {
-      padding: 16px 20px;
+      padding: 12px 20px;
       font-size: 16px;
       font-weight: 600;
       line-height: 27px;
@@ -88,10 +88,11 @@
     }
 
     .heading { color: var(--accent); }
-    .counts { color: var(--muted); font-weight: 400; }
-    .completed { color: var(--success); font-weight: 400; }
+    .tree { color: var(--muted); }
+    .completed { color: var(--muted); font-weight: 400; text-decoration: line-through; }
     .active { color: var(--warning); }
     .pending { color: var(--text); }
+    .dim { color: var(--muted); font-weight: 400; }
   </style>
 </head>
 <body>
@@ -102,11 +103,12 @@
         <span class="traffic-lights" aria-hidden="true"><span></span><span></span><span></span></span>
         <span class="title">pi — pi-todo</span>
       </header>
-      <div class="content"><span class="heading"># Todos</span><span class="counts"> (3 open, 1 running, 1 completed)</span>
-<span class="completed">[✓] Review contracts</span>
-<span class="active">[•] Implement heading spacing</span>
-<span class="pending">[ ] Add cold-start heuristics</span>
-<span class="pending">[ ] Write E2E tests</span></div>
+      <div class="content"><span class="heading">Updated Plan</span>
+<span class="tree">└ </span><span class="completed">[✓] Review contracts</span>
+<span class="tree">  </span><span class="active">[•] Implement heading spacing</span>
+<span class="tree">  </span><span class="pending">[ ] Add cold-start heuristics</span>
+<span class="tree">  </span><span class="pending">[ ] Write E2E tests</span>
+<span class="dim">  +2 more</span></div>
     </section>
   </main>
 </body>

@@ -2,7 +2,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import type { TodoItem, TodoStatus } from "./types.js";
 import { MAX_OVERLAY_LINES, MAX_RESULT_LINES } from "./types.js";
-import { countCompletedTodos, countOpenTodos, countRunningTodos, hasOpenTodos } from "./validate.js";
+import { hasOpenTodos } from "./validate.js";
 
 
 export function getTodoMarker(status: TodoStatus): string {
@@ -121,31 +121,26 @@ export function renderOverlayLines(
 
   const maxLines = Math.max(1, options.maxLines ?? MAX_OVERLAY_LINES);
   const truncate = (line: string) => truncateToWidth(line, width, "…");
-  const open = countOpenTodos(todos);
-  const running = countRunningTodos(todos);
-  const completed = countCompletedTodos(todos);
-  const heading = truncate(
-    theme.fg("accent", theme.bold("# Todos")) +
-      theme.fg("dim", ` (${open} open, ${running} running, ${completed} done)`),
-  );
+  const heading = truncate(theme.fg("accent", theme.bold("Updated Plan")));
 
-  // Small gap between heading and first row — budget -1 to account for the blank line
+  // Tight spacing: heading directly above the tree branch (no blank line gap)
   const layout = selectOverlayLayout(todos, Math.max(3, maxLines - 1));
-  const lines: string[] = [heading, ""];
+  const lines: string[] = [heading];
 
-  for (const todo of layout.visible) {
-    lines.push(truncate(formatThemedTodoLine(todo, theme)));
+  const FIRST = "└ ";
+  const NEXT = "  ";
+  for (let i = 0; i < layout.visible.length; i++) {
+    const prefix = i === 0 ? FIRST : NEXT;
+    lines.push(truncate(prefix + formatThemedTodoLine(layout.visible[i], theme)));
   }
   if (layout.pinnedActive) {
     lines.push(
-      truncate(theme.fg("warning", `Active: ${formatPlainTodoLine(layout.pinnedActive)}`)),
+      truncate(NEXT + theme.fg("warning", `Active: ${formatPlainTodoLine(layout.pinnedActive)}`)),
     );
   }
   if (layout.hiddenCount > 0) {
-    lines.push(truncate(theme.fg("dim", `+${layout.hiddenCount} more`)));
+    lines.push(truncate(NEXT + theme.fg("dim", `+${layout.hiddenCount} more`)));
   }
   lines.push("");
-  // Layout reserves content rows, but the heading and trailing spacer are
-  // rendered here. Enforce the public maxLines contract at the final boundary.
   return lines.slice(0, maxLines);
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.0 (2026-07-27)
+
+### Changed
+
+- **Overlay redesigned**: heading changed from `# Todos (...open, ...running,
+  ...done)` to `"Updated Plan"` (no counts). Items now use a tree-branch
+  layout with `└` connector on the first item and `  ` indentation on
+  subsequent items. Removed blank-line gap between heading and list.
+- **Screenshot updated**: `media/screenshot.html` and `media/screenshot.png`
+  updated to match the new overlay UI.
+
 ## 0.5.0 (2026-07-27)
 
 ### Added

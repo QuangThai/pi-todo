@@ -3,7 +3,7 @@
  *
  * Tools: todo_write (full replace), todo_update (patch by ID), todo_read,
  *        todo_diagnose (read-only)
- * Overlay: # Todos with [ ]/[•]/[✓]/[×] above the editor
+ * Overlay: Updated Plan tree with [ ]/[•]/[✓]/[×] above the editor
  * Persistence: toolResult details + custom entry, replayed from branch
  * Reminder: pi-tasks-style cadence → transient <system-reminder> via context
  * Cold start: pi-todotools section + prompt-aware one-shot context nudge
