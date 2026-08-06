@@ -17,6 +17,7 @@ export interface TodoItem {
 export interface TodoWriteDetails {
   todos: TodoItem[];
   error?: string;
+  warnings?: string[];
   unchanged?: boolean;
 }
 

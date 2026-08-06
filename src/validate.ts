@@ -15,7 +15,12 @@ function formatAvailableIds(current: readonly TodoItem[]): string {
   return ids.join(", ");
 }
 
-export type ValidateOk = { ok: true; todos: TodoItem[]; unchanged: boolean };
+export type ValidateOk = {
+  ok: true;
+  todos: TodoItem[];
+  unchanged: boolean;
+  recoveredIds?: string[];
+};
 export type ValidateErr = { ok: false; error: string };
 export type ValidateResult = ValidateOk | ValidateErr;
 
@@ -37,7 +42,8 @@ export function todosEqual(a: readonly TodoItem[], b: readonly TodoItem[]): bool
 
 /**
  * Validate and normalize a full-replace payload.
- * Hard-enforces at most one `in_progress`. Does not mutate `current`.
+ * Hard-enforces at most one `in_progress`; stale IDs are normalized as new items.
+ * Does not mutate `current`.
  */
 export function validateTodoWrite(
   rawTodos: unknown,
@@ -53,6 +59,8 @@ export function validateTodoWrite(
   const todos: TodoItem[] = [];
   let inProgressCount = 0;
   const seenIds = new Set<string>();
+  const currentIds = new Set(current.map((t) => t.id).filter(Boolean));
+  const recoveredIds: string[] = [];
 
   for (let i = 0; i < rawTodos.length; i++) {
     const item = rawTodos[i];
@@ -87,16 +95,24 @@ export function validateTodoWrite(
 
     if (rec.status === "in_progress") inProgressCount += 1;
 
+    let id: string | undefined;
     if (rec.id !== undefined) {
       if (typeof rec.id !== "string" || !rec.id.trim()) {
         return { ok: false, error: `todos[${i}].id must be a non-empty string when provided` };
       }
-      if (seenIds.has(rec.id)) {
-        return { ok: false, error: `todos[${i}].id "${rec.id}" is duplicated` };
+      if (currentIds.has(rec.id)) {
+        if (seenIds.has(rec.id)) {
+          return { ok: false, error: `todos[${i}].id "${rec.id}" is duplicated` };
+        }
+        seenIds.add(rec.id);
+        id = rec.id;
+      } else {
+        // IDs are session-local. An ID copied from an older session/branch is
+        // a new-item hint, not a reason to reject the whole replacement.
+        recoveredIds.push(rec.id);
       }
-      seenIds.add(rec.id);
     }
-    todos.push({ ...(typeof rec.id === "string" ? { id: rec.id } : {}), content, status: rec.status, priority: rec.priority });
+    todos.push({ ...(id ? { id } : {}), content, status: rec.status, priority: rec.priority });
   }
 
   if (inProgressCount > 1) {
@@ -106,25 +122,18 @@ export function validateTodoWrite(
     };
   }
 
-  // Reject explicit IDs that don't exist in current list
-  // (caller must omit `id` for new items so the system auto-assigns).
-  const currentIds = new Set(current.map((t) => t.id).filter(Boolean));
-  for (let i = 0; i < todos.length; i++) {
-    if (todos[i].id && !currentIds.has(todos[i].id)) {
-      return {
-        ok: false,
-        error: `todos[${i}].id "${todos[i].id}" does not match any existing todo; omit id for new items`,
-      };
-    }
-  }
-
-  return { ok: true, todos, unchanged: todosEqual(todos, current) };
+  return {
+    ok: true,
+    todos,
+    unchanged: todosEqual(todos, current),
+    ...(recoveredIds.length > 0 ? { recoveredIds } : {}),
+  };
 }
 
 /** Assign IDs once at mutation time.
  *
- * - Items with an explicit `id` keep it (must already exist in `current`, verified
- *   by `validateTodoWrite`).
+ * - Items with an explicit ID that exists in `current` keep it; stale/unknown IDs
+ *   are removed by `validateTodoWrite` and are assigned below as new items.
  * - Explicit IDs are reserved before matching so an id-less item cannot claim
  *   an ID that another incoming item explicitly preserves.
  * - Items without `id` try to match a prior item: first by full tuple

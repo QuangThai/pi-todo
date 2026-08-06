@@ -24,6 +24,7 @@ export function registerTodoWriteTool(
       return withStoreLock(() => {
         const current = getTodos();
         const result = validateTodoWrite(params.todos, current);
+        const recoveredIds = result.ok ? result.recoveredIds ?? [] : [];
 
         if (!result.ok) {
           const details: TodoWriteDetails = { todos: current, error: result.error };
@@ -69,11 +70,15 @@ export function registerTodoWriteTool(
           const summary = unchanged
           ? "No change"
             : `${open} open / ${todos.length} total`;
+        const recoveryNote = recoveredIds.length > 0
+          ? `Recovered stale ID(s): ${recoveredIds.join(", ")}.\n\n`
+          : "";
         const body =
-            todos.length === 0 ? "Cleared todos" : formatTodoListText(todos, summary);
+            todos.length === 0 ? `${recoveryNote}Cleared todos` : `${recoveryNote}${formatTodoListText(todos, summary)}`;
 
         const details: TodoWriteDetails = {
             todos,
+            ...(recoveredIds.length > 0 ? { warnings: [`Ignored stale ID(s): ${recoveredIds.join(", ")}`] } : {}),
             ...(unchanged ? { unchanged: true } : {}),
         };
 

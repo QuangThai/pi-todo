@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.1 (2026-08-06)
+
+### Fixed
+
+- **Self-healing full writes**: `todo_write` now treats IDs from an older
+  session or branch as new-item hints instead of rejecting the complete
+  replacement. Duplicate stale IDs are normalized before validation; targeted
+  `todo_update` patches remain strict.
+
 ## 0.6.0 (2026-07-27)
 
 ### Changed

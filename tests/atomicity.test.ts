@@ -41,7 +41,56 @@ beforeEach(() => {
   __resetStore();
 });
 
-describe("todo_write atomicity (appendEntry failure)", () => {
+describe("todo_write recovery and atomicity", () => {
+  it("recovers an invented ID on the initial write", async () => {
+    const mock = createMockPi();
+    registerTodoWriteTool(mock.pi as never, { onCommit: () => {} });
+
+    const result = await mock.execute({
+      todos: [{ id: "t1", content: "Start work", status: "in_progress", priority: "high" }],
+    }) as any;
+
+    expect(result.details.error).toBeUndefined();
+    expect(result.details.warnings).toEqual(["Ignored stale ID(s): t1"]);
+    expect(result.details.todos[0].id).toBe("t1");
+    expect(getTodos()).toEqual(result.details.todos);
+  });
+
+  it("recovers duplicate stale IDs as separate new todos", async () => {
+    const mock = createMockPi();
+    registerTodoWriteTool(mock.pi as never, { onCommit: () => {} });
+
+    const result = await mock.execute({
+      todos: [
+        { id: "stale", content: "First", status: "pending", priority: "low" },
+        { id: "stale", content: "Second", status: "pending", priority: "low" },
+      ],
+    }) as any;
+
+    expect(result.details.error).toBeUndefined();
+    expect(result.details.todos.map((todo: { id: string }) => todo.id)).toEqual(["t1", "t2"]);
+  });
+
+  it("recovers mixed stale IDs while preserving current IDs", async () => {
+    const mock = createMockPi();
+    registerTodoWriteTool(mock.pi as never, { onCommit: () => {} });
+
+    setTodos([
+      { id: "t1", content: "Keep", status: "pending", priority: "medium" },
+    ]);
+
+    const result = await mock.execute({
+      todos: [
+        { id: "old-session-id", content: "Keep", status: "in_progress", priority: "medium" },
+        { id: "old-session-new-id", content: "New", status: "pending", priority: "low" },
+      ],
+    }) as any;
+
+    expect(result.details.error).toBeUndefined();
+    expect(result.details.todos.map((todo: { id: string }) => todo.id)).toEqual(["t1", "t2"]);
+    expect(result.details.todos[0].status).toBe("in_progress");
+  });
+
   it("returns error and keeps store unchanged when appendEntry throws stale-ctx", async () => {
     const mock = createMockPi(() => {
       throw new Error("stale after session replacement: session 2");

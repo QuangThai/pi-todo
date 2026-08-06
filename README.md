@@ -47,6 +47,7 @@ Rules enforced by the tool:
 - `priority` required: `high` | `medium` | `low`
 - Status: `pending` | `in_progress` | `completed` | `cancelled`
 - **ID rule:** omit `id` for a new item; the system assigns a short sequential ID (`t1`, `t2`, …). Only include an ID returned by `todo_read` when retaining an existing item. Never invent an ID. Replacing the list does not inherently reset IDs: matching existing items can retain them.
+- **Stale-ID recovery:** `todo_write` treats an unknown ID as omitted and reallocates/matches the item instead of rejecting the entire full replacement. `todo_update` remains strict because it is an identity-based patch.
 - For changed, repeated, or long/truncated content, include the exact existing ID rather than relying on automatic content matching.
 - Do not call `todo_write` and a `todo_update` that needs its IDs in the same parallel batch. Wait for the write result, then use returned IDs or call `todo_read`.
 - A mutation can contain at most **200** todos/updates.

@@ -28,6 +28,7 @@ Skip when:
 
 - Each call **REPLACES** the entire list (full replace). Always pass the complete todos array.
   - **ID rule:** omit \`id\` for every new item — the system assigns a short ID (\`t1\`, \`t2\`, …). Only preserve an \`id\` returned by \`todo_read\` for an item that already exists; never invent an ID. For changed, repeated, or long/truncated content, preserve the exact existing ID instead of relying on content matching. Full replacement does not inherently reset IDs: matching existing items can retain them.
+  - **Stale-ID recovery:** if a full replacement contains an ID that is not in the current session, \`todo_write\` treats it as a new item instead of rejecting the whole replacement. Do not retry the same payload after a successful recovery.
   - Do not call \`todo_write\` and a dependent \`todo_update\` in the same parallel batch. Complete the write, then use its returned IDs (or \`todo_read\`) for the update.
 - Update status in real time; don't batch completions across multiple finished steps.
 - Mark \`completed\` only after the work is actually done (including verification) — never on intent alone.
@@ -48,7 +49,7 @@ export const TODODIAGNOSE_DESCRIPTION =
 export const TODOWRITE_GUIDELINES = [
   "For multi-step work (3+ steps) or when the user gives a list of tasks, todo_write helps track progress.",
   "Pass the full list every todo_write call (full replace). Keep exactly one todo in_progress; mark completed immediately when a step finishes — never leave a stale in_progress.",
-  "ID rule: for todo_write, omit id for new items so the system assigns a short ID (t1, t2, …). Supply an id only to preserve an existing item, using the exact ID from todo_read; never invent IDs. For changed, repeated, or long/truncated content, preserve that exact ID rather than relying on content matching. For todo_update, id is required and must match a current todo.",
+  "ID rule: for todo_write, omit id for new items so the system assigns a short ID (t1, t2, …). Supply an id only to preserve an existing item, using the exact ID from todo_read; never invent IDs. For changed, repeated, or long/truncated content, preserve that exact ID rather than relying on content matching. Unknown IDs in a full todo_write are recovered as new items; todo_update remains strict and requires a current ID.",
   "Never call todo_write and a todo_update that depends on its IDs in the same parallel batch. Wait for todo_write to finish, then use its returned IDs or call todo_read. If todo_read shows a legacy item without id, rewrite it with todo_write and omit id to assign one before using todo_update.",
   "When finishing a step or when the user confirms done, use todo_update for an ID-based patch when possible; use todo_write only when replacing the full checklist. Advance the next pending item in the same mutation if work continues.",
   "Treat todo array order as the workflow timeline: preserve positions when updating statuses, and only add or reorder items intentionally.",

@@ -115,7 +115,7 @@ describe("validateTodoWrite duplicate IDs", () => {
         { content: "a", status: "pending", priority: "high", id: "dup" },
         { content: "b", status: "pending", priority: "low", id: "dup" },
       ],
-      [],
+      [{ id: "dup", content: "existing", status: "pending", priority: "medium" }],
     );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toMatch(/duplicated/);
@@ -128,7 +128,7 @@ describe("validateTodoWrite duplicate IDs", () => {
         { content: "b", status: "pending", priority: "low", id: "x" },
         { content: "c", status: "in_progress", priority: "medium", id: "x" },
       ],
-      [],
+      [{ id: "x", content: "existing", status: "pending", priority: "medium" }],
     );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toMatch(/duplicated/);
@@ -151,19 +151,25 @@ describe("validateTodoWrite duplicate IDs", () => {
     expect(result.ok).toBe(true);
   });
 
-  it("rejects unknown id not in current list", () => {
+  it("recovers unknown ids as new items", () => {
     const current: TodoItem[] = [
       { id: "known-1", content: "existing", status: "pending", priority: "high" },
     ];
     const result = validateTodoWrite(
       [
         { content: "existing", status: "pending", priority: "high", id: "known-1" },
-        { content: "new task", status: "pending", priority: "low", id: "spoof" },
+        { content: "new task", status: "pending", priority: "low", id: "stale-id" },
+        { content: "another task", status: "pending", priority: "low", id: "stale-id" },
       ],
       current,
     );
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/does not match any existing todo/);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.recoveredIds).toEqual(["stale-id", "stale-id"]);
+      expect(result.todos[0].id).toBe("known-1");
+      expect(result.todos[1].id).toBeUndefined();
+      expect(result.todos[2].id).toBeUndefined();
+    }
   });
 
   it("allows items without ids (auto-assign)", () => {
