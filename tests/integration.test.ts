@@ -136,9 +136,9 @@ describe("validate→store→format integration", () => {
     ]);
 
     const lines = renderOverlayLines(getTodos(), identityTheme, 80);
-    expect(lines[0]).toBe("❏ Updated Plan");
-    expect(lines).toContain("    [•] active");
-    expect(lines).toContain("    [ ] next");
+    expect(lines[0]).toBe("Updated Plan");
+    expect(lines).toContain("  [•] active");
+    expect(lines).toContain("  [ ] next");
   });
 
   it("overlay hides when all items from store are terminal", () => {
@@ -174,7 +174,7 @@ describe("validate→store→format integration", () => {
     ]);
 
     const lines = renderOverlayLines(getTodos(), identityTheme, 80, { maxLines: 4 });
-    expect(lines).toContain("  └ [•] active");
+    expect(lines).toContain("└ [•] active");
     expect(lines.some((l) => l.includes("+5 more"))).toBe(true);
   });
 });

@@ -6,7 +6,7 @@
 
 OpenCode-style session todo checklist for the [pi coding agent](https://pi.dev).
 
-Adds `todo_write` / `todo_update` / `todo_read` / `todo_diagnose`, a live `❏ Updated Plan` overlay above the editor (`[ ]` / `[•]` / `[✓]` / `[×]`), and branch-replay persistence (survives `/reload`, tree nav, and custom-entry durability across compaction).
+Adds `todo_write` / `todo_update` / `todo_read` / `todo_diagnose`, a live `# Todos` overlay above the editor (`[ ]` / `[•]` / `[✓]` / `[×]`), and branch-replay persistence (survives `/reload`, tree nav, and custom-entry durability across compaction).
 
 ## Install
 
@@ -82,10 +82,15 @@ Shown above the editor while any **open** todo remains (`pending` / `in_progress
 
 Hidden when the list is empty or every item is `completed` / `cancelled`.
 
-The heading is `❏ Updated Plan`. Its marker starts at transcript column 0, the title and first tree connector start at column 2, and nested todo rows start at column 4 so the overlay aligns with pi-omp-theme tool surfaces.
+Heading shows open, running, and completed counts, e.g. `# Todos (3 open, 1 running, 1 completed)`:
 
-Items always stay in the array's workflow order; status changes only their marker/color. The first visible item uses a `└` connector; following rows continue at the nested content column without inserting a blank line below the heading.
+- **open** = `pending` + `in_progress`
+- **running** = `in_progress` only (0 or 1 after a valid write)
+- **completed** = `completed` only; `cancelled` todos are not counted
+
+Items always stay in the array's workflow order; status changes only their marker/color.
 When space is tight, the overlay shows the earliest checklist items and `+N more`. If the active item is outside that prefix, it is repeated as `Active: [•] …` rather than moved ahead of earlier work.
+A blank line separates the heading from the first todo row for visual breathing room.
 Successful `todo_write` and `todo_update` results display `✓ Saved`, meaning the durable checkpoint was accepted before the in-memory snapshot was updated.
 
 ## Development
