@@ -159,12 +159,12 @@ describe("renderOverlayLines", () => {
       identityTheme,
       80,
     );
-    expect(lines[0]).toBe("Updated Plan");
+    expect(lines[0]).toBe("❏ Updated Plan");
   });
 
   it("shows correct counts with no completed work", () => {
     const lines = renderOverlayLines([t("a", "pending"), t("b", "pending")], identityTheme, 80);
-    expect(lines[0]).toBe("Updated Plan");
+    expect(lines[0]).toBe("❏ Updated Plan");
   });
 
   it("excludes completed and cancelled items from open/running counts", () => {
@@ -179,18 +179,18 @@ describe("renderOverlayLines", () => {
       identityTheme,
       80,
     );
-    expect(lines[0]).toBe("Updated Plan");
+    expect(lines[0]).toBe("❏ Updated Plan");
   });
 
-  it("has a minimal blank-line gap between heading and first todo row", () => {
+  it("aligns the heading and todo tree to the shared transcript columns", () => {
     const lines = renderOverlayLines(
       [t("a", "completed"), t("b", "in_progress"), t("c", "pending")],
       identityTheme,
       80,
     );
-    expect(lines[0]).toContain("Updated Plan");
-    expect(lines[1]).toMatch(/^└ /);
-    expect(lines[2]).toMatch(/^  /);
+    expect(lines[0]).toBe("❏ Updated Plan");
+    expect(lines[1]).toMatch(/^  └ /);
+    expect(lines[2]).toMatch(/^    /);
   });
 
   it("returns empty when no open work (never shows 0 open heading)", () => {
@@ -213,7 +213,7 @@ describe("renderOverlayLines", () => {
       { maxLines: 5 },
     );
     expect(lines).toHaveLength(5);
-    expect(lines).toContain("  Active: [•] active");
+    expect(lines).toContain("    Active: [•] active");
     expect(lines.some((line) => line.includes("+2 more"))).toBe(true);
   });
 
@@ -279,9 +279,9 @@ describe("selectOverlayLayout overflow edge cases", () => {
         t("next", "pending"),
       ];
       const lines = renderOverlayLines(todos, identityTheme, 80, { maxLines: 5 });
-      expect(lines).toContain("└ [✓] done-1");
-      expect(lines).toContain("  Active: [•] active");
-      expect(lines).not.toContain("└ [✓] done-2");
+      expect(lines).toContain("  └ [✓] done-1");
+      expect(lines).toContain("    Active: [•] active");
+      expect(lines).not.toContain("  └ [✓] done-2");
     });
 
     it("preserves completed work before the active follow-up when all items fit", () => {

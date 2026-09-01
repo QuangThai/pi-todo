@@ -121,14 +121,16 @@ export function renderOverlayLines(
 
   const maxLines = Math.max(1, options.maxLines ?? MAX_OVERLAY_LINES);
   const truncate = (line: string) => truncateToWidth(line, width, "…");
-  const heading = truncate(theme.fg("accent", theme.bold("Updated Plan")));
+  // Shared transcript geometry: marker at column 0, title/tree at column 2.
+  // This matches boxed-tool content and the Read/List/Grep quiet-tool family.
+  const heading = truncate(theme.fg("accent", theme.bold("❏ Updated Plan")));
 
   // Tight spacing: heading directly above the tree branch (no blank line gap)
   const layout = selectOverlayLayout(todos, Math.max(3, maxLines - 1));
   const lines: string[] = [heading];
 
-  const FIRST = "└ ";
-  const NEXT = "  ";
+  const FIRST = "  └ ";
+  const NEXT = "    ";
   for (let i = 0; i < layout.visible.length; i++) {
     const prefix = i === 0 ? FIRST : NEXT;
     lines.push(truncate(prefix + formatThemedTodoLine(layout.visible[i], theme)));

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.2 (2026-09-01)
+
+### Fixed
+
+- **Shared transcript alignment**: the live overlay now follows the same
+  column contract as pi-omp-theme tool surfaces. The `❏` marker starts at
+  column 0, `Updated Plan` and its first tree connector start at column 2,
+  and nested todo rows start at column 4.
+- Updated overlay, integration, documentation, and screenshot fixtures to
+  lock the aligned heading/tree geometry.
+
 ## 0.6.1 (2026-08-06)
 
 ### Fixed
