@@ -1,11 +1,14 @@
 /**
  * Prompt intent heuristics for cold-start / completion nudges.
  *
- * Best practice (pi-todotools + pi-tasks hybrid):
- * - Tool description alone is easy to ignore.
- * - Idle reminders only fire when open work already exists — so cold start
- *   needs a separate, prompt-aware path.
- * - We never invent todo items from chat.
+ * Why these exist:
+ * - A tool description alone is easy for a model to ignore.
+ * - Idle reminders only fire when open work already exists, so a cold start
+ *   (empty list) needs a separate, prompt-aware path.
+ * - We never invent todo items from chat; we only nudge.
+ *
+ * These nudges are delivered as a transient tail message from the `context`
+ * event, never by editing the system prompt — see prompt.ts for why.
  *
  * Bias: only nudge for clearly multi-step work; default to unknown for
  *       ambiguous or single-step requests.
@@ -34,19 +37,17 @@ const EXPLICIT_TODO =
   /\b(todo|todos|task\s*list|checklist|break\s*(it|this)\s*down|step\s*by\s*step|multi[\s-]*step|kế\s*hoạch|danh\s*sách\s*việc)\b/i;
 
 /** Numbered / bulleted multi-item asks (at least 2 items). */
-const LIST_MARKERS = /(?:^|\n)\s*(?:\d+[\.\)]\s+\S|[-*]\s+\S)/;
+const LIST_MARKERS = /(?:^|\n)\s*(?:\d+[.)]\s+\S|[-*]\s+\S)/g;
 
 /** Completion / done signals from the user. */
 const COMPLETION_SIGNAL =
-  /\b(done|finished|complete[d]?|ship\s*it|lgtm|approved|looks\s*good|đã\s*xong|xong\s*rồi|ok\s*ship|được\s*rồi|hoàn\s*thành)\b/i;
+  /\b(done|finished|completed?|ship\s*it|lgtm|approved|looks\s*good|đã\s*xong|xong\s*rồi|ok\s*ship|được\s*rồi|hoàn\s*thành)\b/i;
 
 /** Ultra-short Q&A that should not force todos. */
-const TRIVIAL =
-  /^(hi|hello|hey|thanks?|ok|yes|no|yep|nope|ping|help|\?+|cảm\s*ơn|chào)\s*[.!]?$/i;
+const TRIVIAL = /^(hi|hello|hey|thanks?|ok|yes|no|yep|nope|ping|help|\?+|cảm\s*ơn|chào)\s*[.!]?$/i;
 
 /** Short factual look-ups — still unknown/skip, not forced. */
-const FACTOID =
-  /^(what('?s| is| are)|who('?s| is)|where('?s| is)|which|bao nhiêu|là gì)\b/i;
+const FACTOID = /^(what('?s| is| are)|who('?s| is)|where('?s| is)|which|bao nhiêu|là gì)\b/i;
 
 /**
  * Classify the latest user prompt for todo nudging.
@@ -75,8 +76,8 @@ export function classifyPrompt(prompt: string): PromptIntent {
     return { kind: "multi_step", reason: "explicit_todo" };
   }
 
-  // Multi-item lists (≥2 bullets or numbered items).
-  const markers = text.match(/(?:^|\n)\s*(?:\d+[\.\)]\s+\S|[-*]\s+\S)/g);
+  // Multi-item lists (>=2 bullets or numbered items).
+  const markers = text.match(LIST_MARKERS);
   if (markers && markers.length >= 2) {
     return { kind: "multi_step", reason: "list_markers" };
   }
@@ -105,7 +106,7 @@ export function classifyPrompt(prompt: string): PromptIntent {
     return { kind: "multi_step", reason: "substantive_length" };
   }
 
-  // Two+ sentences / newlines → sometimes multi-step instructions.
+  // Two+ sentences / newlines -> sometimes multi-step instructions.
   const sentenceBreaks = (text.match(/[.!?\n]/g) ?? []).length;
   if (sentenceBreaks >= 3 && text.length >= 80) {
     return { kind: "multi_step", reason: "multi_sentence" };
@@ -114,20 +115,19 @@ export function classifyPrompt(prompt: string): PromptIntent {
   return { kind: "unknown", reason: "no_strong_signal" };
 }
 
-/** True when a cold-start todo reminder is relevant. */
-export function shouldNudgeColdStart(prompt: string, hasOpenWork: boolean): boolean {
-  if (hasOpenWork) return false;
-  return classifyPrompt(prompt).kind === "multi_step";
-}
-
-/** True when we should nudge updating completed status from a user "done" signal. */
-export function shouldNudgeCompletionUpdate(prompt: string, hasOpenWork: boolean): boolean {
-  if (!hasOpenWork) return false;
-  return classifyPrompt(prompt).kind === "completion";
+/**
+ * Neutralize text that is echoed back inside a `<system-reminder>` block.
+ *
+ * The echoed value is user- or file-supplied, so a literal closing tag would let
+ * it escape the reminder and speak with system authority for the rest of the
+ * message.
+ */
+export function escapeReminderPayload(text: string): string {
+  return text.replace(/</g, "‹");
 }
 
 export function buildColdStartReminder(prompt: string): string {
-  const clipped = prompt.trim().replace(/\s+/g, " ").slice(0, 160);
+  const clipped = escapeReminderPayload(prompt.trim().replace(/\s+/g, " ").slice(0, 160));
   return `<system-reminder>
 This request may involve multiple steps. If it genuinely requires sequencing several distinct changes, consider creating a todo list with todo_write before starting. Otherwise proceed directly.
 
@@ -140,7 +140,7 @@ NEVER mention this reminder to the user.
 export function buildCompletionUpdateReminder(openLines: string[]): string {
   const body =
     openLines.length > 0
-      ? `\nOpen todos:\n${openLines.map((l) => `- ${l}`).join("\n")}\n`
+      ? `\nOpen todos:\n${openLines.map((l) => `- ${escapeReminderPayload(l)}`).join("\n")}\n`
       : "\n";
   return `<system-reminder>
 The user may have signaled completion. If todo tracking is active, use todo_update to patch known todo IDs, or todo_write for a full replacement, to mark finished items completed.

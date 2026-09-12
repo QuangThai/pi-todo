@@ -1,22 +1,20 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { __resetStore, getTodos, setTodos } from "../src/store.js";
 import { registerTodoWriteTool } from "../src/tools/todowrite.js";
-import { getTodos, setTodos, __resetStore } from "../src/store.js";
+import type { TodoWriteDetails } from "../src/types.js";
+
+type ToolResult = { content: Array<{ type: string; text: string }>; details: TodoWriteDetails };
+type ToolExecute = (toolCallId: string, params: Record<string, unknown>) => Promise<ToolResult>;
 
 /**
  * Build a minimal mock pi that captures the registered tool handler
  * and exposes a controllable appendEntry that can throw synchronously.
  */
 function createMockPi(appendEntryImpl: () => void = () => {}) {
-  let registeredHandler: { execute: Function } | null = null;
+  let registeredHandler: { execute: ToolExecute } | null = null;
   let appendEntryCalled = false;
 
-  const registerTool = (opts: {
-    name: string;
-    label: string;
-    description: string;
-    parameters: unknown;
-    execute: Function;
-  }) => {
+  const registerTool = (opts: { execute: ToolExecute }) => {
     registeredHandler = { execute: opts.execute };
   };
 
@@ -32,7 +30,7 @@ function createMockPi(appendEntryImpl: () => void = () => {}) {
     /** Helper: call the captured execute handler */
     async execute(params: Record<string, unknown>) {
       if (!registeredHandler) throw new Error("Handler not registered");
-      return registeredHandler.execute("tool_1", params) as Promise<unknown>;
+      return registeredHandler.execute("tool_1", params);
     },
   };
 }
@@ -46,12 +44,12 @@ describe("todo_write recovery and atomicity", () => {
     const mock = createMockPi();
     registerTodoWriteTool(mock.pi as never, { onCommit: () => {} });
 
-    const result = await mock.execute({
+    const result = (await mock.execute({
       todos: [{ id: "t1", content: "Start work", status: "in_progress", priority: "high" }],
-    }) as any;
+    })) as ToolResult;
 
     expect(result.details.error).toBeUndefined();
-    expect(result.details.warnings).toEqual(["Ignored stale ID(s): t1"]);
+    expect(result.details.warnings).toEqual(["Recovered stale ID(s) as new items: t1"]);
     expect(result.details.todos[0].id).toBe("t1");
     expect(getTodos()).toEqual(result.details.todos);
   });
@@ -60,34 +58,32 @@ describe("todo_write recovery and atomicity", () => {
     const mock = createMockPi();
     registerTodoWriteTool(mock.pi as never, { onCommit: () => {} });
 
-    const result = await mock.execute({
+    const result = (await mock.execute({
       todos: [
         { id: "stale", content: "First", status: "pending", priority: "low" },
         { id: "stale", content: "Second", status: "pending", priority: "low" },
       ],
-    }) as any;
+    })) as ToolResult;
 
     expect(result.details.error).toBeUndefined();
-    expect(result.details.todos.map((todo: { id: string }) => todo.id)).toEqual(["t1", "t2"]);
+    expect(result.details.todos.map((todo) => todo.id)).toEqual(["t1", "t2"]);
   });
 
   it("recovers mixed stale IDs while preserving current IDs", async () => {
     const mock = createMockPi();
     registerTodoWriteTool(mock.pi as never, { onCommit: () => {} });
 
-    setTodos([
-      { id: "t1", content: "Keep", status: "pending", priority: "medium" },
-    ]);
+    setTodos([{ id: "t1", content: "Keep", status: "pending", priority: "medium" }]);
 
-    const result = await mock.execute({
+    const result = (await mock.execute({
       todos: [
         { id: "old-session-id", content: "Keep", status: "in_progress", priority: "medium" },
         { id: "old-session-new-id", content: "New", status: "pending", priority: "low" },
       ],
-    }) as any;
+    })) as ToolResult;
 
     expect(result.details.error).toBeUndefined();
-    expect(result.details.todos.map((todo: { id: string }) => todo.id)).toEqual(["t1", "t2"]);
+    expect(result.details.todos.map((todo) => todo.id)).toEqual(["t1", "t2"]);
     expect(result.details.todos[0].status).toBe("in_progress");
   });
 
@@ -98,14 +94,12 @@ describe("todo_write recovery and atomicity", () => {
     registerTodoWriteTool(mock.pi as never, { onCommit: () => {} });
 
     // Set initial store state
-    setTodos([
-      { content: "Keep me", status: "in_progress" as const, priority: "high" as const },
-    ]);
+    setTodos([{ content: "Keep me", status: "in_progress" as const, priority: "high" as const }]);
 
     // Attempt write
-    const result = await mock.execute({
+    const result = (await mock.execute({
       todos: [{ content: "New thing", status: "pending", priority: "low" }],
-    }) as any;
+    })) as ToolResult;
 
     // Should have returned an error
     expect(result.details.error).toBeDefined();
@@ -123,9 +117,7 @@ describe("todo_write recovery and atomicity", () => {
     });
     registerTodoWriteTool(mock.pi as never, { onCommit: () => {} });
 
-    setTodos([
-      { content: "Safe", status: "in_progress" as const, priority: "medium" as const },
-    ]);
+    setTodos([{ content: "Safe", status: "in_progress" as const, priority: "medium" as const }]);
 
     // The real error should propagate (rethrow)
     await expect(
@@ -144,13 +136,11 @@ describe("todo_write recovery and atomicity", () => {
     const mock = createMockPi(); // no throw
     registerTodoWriteTool(mock.pi as never, { onCommit: () => {} });
 
-    setTodos([
-      { content: "Old", status: "in_progress" as const, priority: "high" as const },
-    ]);
+    setTodos([{ content: "Old", status: "in_progress" as const, priority: "high" as const }]);
 
-    const result = await mock.execute({
+    const result = (await mock.execute({
       todos: [{ content: "New", status: "pending", priority: "low" }],
-    }) as any;
+    })) as ToolResult;
 
     // Should succeed
     expect(result.details.error).toBeUndefined();
@@ -165,13 +155,11 @@ describe("todo_write recovery and atomicity", () => {
     });
     registerTodoWriteTool(mock.pi as never, { onCommit: () => {} });
 
-    const existing = [
-      { content: "Stable", status: "in_progress" as const, priority: "medium" as const },
-    ];
+    const existing = [{ content: "Stable", status: "in_progress" as const, priority: "medium" as const }];
     setTodos(existing);
 
     // Write identical content
-    const result = await mock.execute({ todos: existing }) as any;
+    const result = (await mock.execute({ todos: existing })) as ToolResult;
 
     expect(result.details.unchanged).toBe(true);
     const stored = getTodos();

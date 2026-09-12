@@ -1,6 +1,5 @@
 import type { TodoItem, TodoWriteDetails } from "./types.js";
-import { TODO_STATE_ENTRY_TYPE, TOOL_UPDATE, TOOL_WRITE } from "./types.js";
-import { TERMINAL_STATUSES, TODO_PRIORITIES, TODO_STATUSES } from "./types.js";
+import { TODO_PRIORITIES, TODO_STATE_ENTRY_TYPE, TODO_STATUSES, TOOL_UPDATE, TOOL_WRITE } from "./types.js";
 
 type BranchEntry = {
   type?: string;
@@ -35,17 +34,16 @@ function isWriteDetails(value: unknown): value is TodoWriteDetails {
 /**
  * Replay todo state from the session branch.
  *
- * Pi guarantees getBranch() returns entries in root→leaf (chronological) order.
- * Last valid entry wins — custom `pi-todo.state` entries plus both mutation
- * toolResult details are tracked. Tool-result replay is a fallback when a
- * compaction retains messages but drops old custom entries.
+ * Pi's `getBranch()` walks leaf->root then reverses, so entries arrive in
+ * root->leaf (chronological) order. Last valid entry wins — custom
+ * `pi-todo.state` entries plus both mutation toolResult details are tracked.
+ * Tool-result replay is a fallback when a compaction retains messages but drops
+ * old custom entries.
  *
  * Error envelopes (e.g. validation failures) are skipped so they never
  * overwrite a good state.
  */
-export function replayFromBranch(ctx: {
-  sessionManager: { getBranch(): Iterable<unknown> };
-}): TodoItem[] {
+export function replayFromBranch(ctx: { sessionManager: { getBranch(): Iterable<unknown> } }): TodoItem[] {
   let todos: TodoItem[] = [];
 
   for (const entry of ctx.sessionManager.getBranch()) {
@@ -60,21 +58,14 @@ export function replayFromBranch(ctx: {
 
     if (e.type !== "message" || !isRecord(e.message)) continue;
     const msg = e.message as Record<string, unknown>;
-    if (
-      msg.role !== "toolResult" ||
-      (msg.toolName !== TOOL_WRITE && msg.toolName !== TOOL_UPDATE)
-    ) {
+    if (msg.role !== "toolResult" || (msg.toolName !== TOOL_WRITE && msg.toolName !== TOOL_UPDATE)) {
       continue;
     }
     if (!isWriteDetails(msg.details)) continue;
     // Skip error envelopes — they did not commit
-    if ((msg.details as TodoWriteDetails).error) continue;
-    todos = (msg.details as TodoWriteDetails).todos.map((t) => ({ ...t }));
+    if (msg.details.error) continue;
+    todos = msg.details.todos.map((t) => ({ ...t }));
   }
 
   return todos;
-}
-
-export function isTerminalList(todos: readonly TodoItem[]): boolean {
-  return todos.length === 0 || todos.every((t) => TERMINAL_STATUSES.has(t.status));
 }

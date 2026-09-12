@@ -1,8 +1,8 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { replayFromBranch } from "../src/replay.js";
-import { getTodos, setTodos, __resetStore } from "../src/store.js";
-import { ensureTodoIds, validateTodoWrite } from "../src/validate.js";
+import { __resetStore, getTodos, setTodos } from "../src/store.js";
 import { TODO_STATE_ENTRY_TYPE, TOOL_UPDATE, TOOL_WRITE } from "../src/types.js";
+import { ensureTodoIds, validateTodoWrite } from "../src/validate.js";
 
 /**
  * Build a fake branch entry for a todo mutation tool result.
@@ -15,7 +15,7 @@ function toolResultEntry(
     type: "message",
     message: {
       role: "toolResult",
-        toolName,
+      toolName,
       details: { todos },
     },
   };
@@ -24,9 +24,7 @@ function toolResultEntry(
 /**
  * Build a fake branch entry for a custom pi-todo.state entry.
  */
-function customStateEntry(
-  todos: Array<{ content: string; status: string; priority: string }>,
-) {
+function customStateEntry(todos: Array<{ content: string; status: string; priority: string }>) {
   return {
     type: "custom",
     customType: TODO_STATE_ENTRY_TYPE,
@@ -49,9 +47,7 @@ beforeEach(() => {
 describe("persistence roundtrip accuracy", () => {
   it("write → replayFromBranch returns latest written state", () => {
     // Simulate: todo_write called with list A
-    const todosA = [
-      { content: "Task A", status: "pending", priority: "high" },
-    ];
+    const todosA = [{ content: "Task A", status: "pending", priority: "high" }];
     const rA = validateTodoWrite(todosA, getTodos());
     expect(rA.ok).toBe(true);
     if (rA.ok) setTodos(rA.todos);
@@ -67,10 +63,7 @@ describe("persistence roundtrip accuracy", () => {
 
     // Now simulate session restart: replay from branch with both entries.
     // Branch is chronological (root→leaf), so the later entry wins.
-    const entries = [
-      toolResultEntry(todosA),
-      toolResultEntry(todosB),
-    ];
+    const entries = [toolResultEntry(todosA), toolResultEntry(todosB)];
     const replayed = replayFromBranch(branch(entries));
     expect(replayed).toHaveLength(2);
     expect(replayed[0].content).toBe("Task A");
@@ -81,12 +74,8 @@ describe("persistence roundtrip accuracy", () => {
 
   it("custom entry overrides earlier toolResult entry", () => {
     const entries = [
-      toolResultEntry([
-        { content: "Stale", status: "pending", priority: "low" },
-      ]),
-      customStateEntry([
-        { content: "Fresh", status: "in_progress", priority: "high" },
-      ]),
+      toolResultEntry([{ content: "Stale", status: "pending", priority: "low" }]),
+      customStateEntry([{ content: "Fresh", status: "in_progress", priority: "high" }]),
     ];
     const replayed = replayFromBranch(branch(entries));
     expect(replayed).toHaveLength(1);
@@ -95,12 +84,8 @@ describe("persistence roundtrip accuracy", () => {
 
   it("last custom entry wins when multiple custom entries exist", () => {
     const entries = [
-      customStateEntry([
-        { content: "Old state", status: "pending", priority: "medium" },
-      ]),
-      customStateEntry([
-        { content: "New state", status: "in_progress", priority: "high" },
-      ]),
+      customStateEntry([{ content: "Old state", status: "pending", priority: "medium" }]),
+      customStateEntry([{ content: "New state", status: "in_progress", priority: "high" }]),
     ];
     const replayed = replayFromBranch(branch(entries));
     expect(replayed).toHaveLength(1);
@@ -121,9 +106,7 @@ describe("persistence roundtrip accuracy", () => {
           details: { result: "ok" },
         },
       },
-      toolResultEntry([
-        { content: "Only todo", status: "in_progress", priority: "high" },
-      ]),
+      toolResultEntry([{ content: "Only todo", status: "in_progress", priority: "high" }]),
     ];
     const replayed = replayFromBranch(branch(entries));
     expect(replayed).toHaveLength(1);
@@ -132,9 +115,7 @@ describe("persistence roundtrip accuracy", () => {
 
   it("error envelope does not overwrite good state", () => {
     const entries = [
-      toolResultEntry([
-        { content: "Good", status: "in_progress", priority: "high" },
-      ]),
+      toolResultEntry([{ content: "Good", status: "in_progress", priority: "high" }]),
       {
         type: "message",
         message: {
@@ -159,9 +140,7 @@ describe("persistence roundtrip accuracy", () => {
 
   it("write→read→write→read cycle reflects latest state", () => {
     // Write 1: initial list
-    const write1 = [
-      { content: "Step 1", status: "in_progress", priority: "high" },
-    ];
+    const write1 = [{ content: "Step 1", status: "in_progress", priority: "high" }];
     const r1 = validateTodoWrite(write1, getTodos());
     expect(r1.ok).toBe(true);
     if (r1.ok) setTodos(r1.todos);
@@ -188,11 +167,7 @@ describe("persistence roundtrip accuracy", () => {
     expect(getTodos()).toHaveLength(0);
 
     // Replay from branch with all 3 writes → should reflect latest (empty)
-    const entries = [
-      toolResultEntry(write1),
-      toolResultEntry(write2),
-      toolResultEntry(write3),
-    ];
+    const entries = [toolResultEntry(write1), toolResultEntry(write2), toolResultEntry(write3)];
     const replayed = replayFromBranch(branch(entries));
     expect(replayed).toHaveLength(0);
   });
@@ -200,9 +175,7 @@ describe("persistence roundtrip accuracy", () => {
 
 describe("persistence with custom entries (todowrite's pi.appendEntry)", () => {
   it("todo_write with unchanged flag does not append custom entry", () => {
-    const initial = [
-      { content: "Task", status: "pending" as const, priority: "medium" as const },
-    ];
+    const initial = [{ content: "Task", status: "pending" as const, priority: "medium" as const }];
     setTodos(initial);
 
     const branchWithEntry = [customStateEntry(initial)];
@@ -213,22 +186,14 @@ describe("persistence with custom entries (todowrite's pi.appendEntry)", () => {
   });
 
   it("custom entry + toolResult (todowrite double-write)", () => {
-    const todos = [
-      { content: "Stable", status: "in_progress", priority: "high" },
-    ];
+    const todos = [{ content: "Stable", status: "in_progress", priority: "high" }];
 
-    const entries = [
-      customStateEntry(todos),
-      toolResultEntry(todos),
-    ];
+    const entries = [customStateEntry(todos), toolResultEntry(todos)];
     expect(replayFromBranch(branch(entries))).toEqual([
       { content: "Stable", status: "in_progress", priority: "high" },
     ]);
 
-    const entriesRev = [
-      toolResultEntry(todos),
-      customStateEntry(todos),
-    ];
+    const entriesRev = [toolResultEntry(todos), customStateEntry(todos)];
     expect(replayFromBranch(branch(entriesRev))).toEqual([
       { content: "Stable", status: "in_progress", priority: "high" },
     ]);
@@ -277,10 +242,7 @@ describe("ID persistence through replay", () => {
     setTodos(rB.todos);
 
     // Replay from branch entries → IDs must be preserved
-    const entries = [
-      customStateEntry(storedAfterA),
-      customStateEntry(rB.todos),
-    ];
+    const entries = [customStateEntry(storedAfterA), customStateEntry(rB.todos)];
     const replayed = replayFromBranch(branch(entries));
     expect(replayed).toHaveLength(2);
     expect(replayed[0].id).toBe(storedAfterA[0].id);

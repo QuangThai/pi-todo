@@ -1,72 +1,56 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { registerTodoDiagnoseTool } from "../src/tools/tododiagnose.js";
-import { __resetStore, setTodos } from "../src/store.js";
+import { describe, expect, it } from "vitest";
+import { diagnoseTodos, formatDiagnosis, summarizeDiagnosis } from "../src/diagnose.js";
+import { replayFromBranch } from "../src/replay.js";
+import type { TodoItem } from "../src/types.js";
 import { TODO_STATE_ENTRY_TYPE } from "../src/types.js";
 
-function createMockPi() {
-  let execute: ((...args: unknown[]) => Promise<unknown>) | undefined;
-  return {
-    pi: {
-      registerTool: (definition: { execute: (...args: unknown[]) => Promise<unknown> }) => {
-        execute = definition.execute;
-      },
-    },
-    execute: async (entries: unknown[]) => {
-      if (!execute) throw new Error("diagnostic tool was not registered");
-      return execute("call_1", {}, undefined, undefined, {
-        sessionManager: { getBranch: () => entries },
-      });
-    },
-  };
-}
+const branchWith = (todos: TodoItem[]) => ({
+  sessionManager: {
+    getBranch: () => [{ type: "custom", customType: TODO_STATE_ENTRY_TYPE, data: { todos } }],
+  },
+});
 
-beforeEach(() => __resetStore());
-
-describe("todo_diagnose", () => {
-  it("reports consistent when store matches durable replay", async () => {
-    const todos = [{ id: "task", content: "Task", status: "in_progress" as const, priority: "high" as const }];
-    setTodos(todos);
-    const mock = createMockPi();
-    registerTodoDiagnoseTool(mock.pi as never);
-
-    const result = await mock.execute([
-      { type: "custom", customType: TODO_STATE_ENTRY_TYPE, data: { todos } },
-    ]) as { details: { status: string } };
-
-    expect(result.details.status).toBe("consistent");
+describe("diagnoseTodos", () => {
+  it("reports consistent when the live snapshot matches the durable replay", () => {
+    const todos: TodoItem[] = [{ id: "t1", content: "Task", status: "in_progress", priority: "high" }];
+    const diagnosis = diagnoseTodos(todos, replayFromBranch(branchWith(todos)));
+    expect(diagnosis.status).toBe("consistent");
+    expect(summarizeDiagnosis(diagnosis)).toMatch(/consistent/);
   });
 
-  it("reports mismatch without modifying either snapshot", async () => {
-    setTodos([{ id: "live", content: "Live", status: "pending" as const, priority: "low" as const }]);
-    const mock = createMockPi();
-    registerTodoDiagnoseTool(mock.pi as never);
-
-    const result = await mock.execute([
-      {
-        type: "custom",
-        customType: TODO_STATE_ENTRY_TYPE,
-          data: { todos: [{ id: "durable", content: "Durable", status: "completed", priority: "high" }] },
-      },
-    ]) as { details: { status: string; storeTodos: Array<{ content: string }> } };
-
-    expect(result.details.status).toBe("mismatch");
-    expect(result.details.storeTodos[0].content).toBe("Live");
-  });
-
-  it("reports repair_needed when matching snapshots contain duplicate IDs", async () => {
-    const todos = [
-      { id: "dup", content: "One", status: "pending" as const, priority: "low" as const },
-      { id: "dup", content: "Two", status: "completed" as const, priority: "high" as const },
+  it("reports mismatch without modifying either snapshot", () => {
+    const live: TodoItem[] = [{ id: "live", content: "Live", status: "pending", priority: "low" }];
+    const durable: TodoItem[] = [
+      { id: "durable", content: "Durable", status: "completed", priority: "high" },
     ];
-    setTodos(todos);
-    const mock = createMockPi();
-    registerTodoDiagnoseTool(mock.pi as never);
+    const diagnosis = diagnoseTodos(live, replayFromBranch(branchWith(durable)));
 
-    const result = await mock.execute([
-      { type: "custom", customType: TODO_STATE_ENTRY_TYPE, data: { todos } },
-    ]) as { details: { status: string; integrityIssues: string[] } };
+    expect(diagnosis.status).toBe("mismatch");
+    expect(diagnosis.storeTodos[0].content).toBe("Live");
+    expect(diagnosis.replayedTodos[0].content).toBe("Durable");
+    // Snapshots are copied, so a caller cannot mutate the store through the report.
+    diagnosis.storeTodos[0].content = "tampered";
+    expect(live[0].content).toBe("Live");
+  });
 
-    expect(result.details.status).toBe("repair_needed");
-    expect(result.details.integrityIssues).toContain('current: todos[1].id "dup" is duplicated');
+  it("reports repair_needed when matching snapshots contain duplicate IDs", () => {
+    const todos: TodoItem[] = [
+      { id: "dup", content: "One", status: "pending", priority: "low" },
+      { id: "dup", content: "Two", status: "completed", priority: "high" },
+    ];
+    const diagnosis = diagnoseTodos(todos, replayFromBranch(branchWith(todos)));
+    expect(diagnosis.status).toBe("repair_needed");
+    expect(diagnosis.integrityIssues).toContain('current: todos[1].id "dup" is duplicated');
+    expect(diagnosis.integrityIssues).toContain('durable: todos[1].id "dup" is duplicated');
+  });
+
+  it("renders a report with both snapshots and the issue list", () => {
+    const todos: TodoItem[] = [{ content: "No ID", status: "pending", priority: "low" }];
+    const report = formatDiagnosis(diagnoseTodos(todos, [])).join("\n");
+    expect(report).toMatch(/REPAIR NEEDED/);
+    expect(report).toMatch(/live \(1\)/);
+    expect(report).toMatch(/durable \(0\)/);
+    expect(report).toMatch(/\(empty\)/);
+    expect(report).toMatch(/has no stable ID/);
   });
 });

@@ -1,91 +1,68 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
+import { prepareTodoWriteArgs } from "../coerce.js";
 import { formatTodoListText } from "../format.js";
 import { TODOWRITE_DESCRIPTION, TODOWRITE_GUIDELINES } from "../prompt.js";
-import { TodoWriteParams } from "../schema.js";
+import { type TodoWriteInput, TodoWriteParams } from "../schema.js";
 import { getTodos, setTodos, withStoreLock } from "../store.js";
 import type { TodoWriteDetails } from "../types.js";
-import { TODO_STATE_ENTRY_TYPE, TOOL_WRITE } from "../types.js";
+import { TOOL_WRITE } from "../types.js";
 import { countOpenTodos, ensureTodoIds, todosEqual, validateTodoWrite } from "../validate.js";
+import { errorResult, persistTodoState } from "./persist.js";
 
-export function registerTodoWriteTool(
-  pi: ExtensionAPI,
-  options: { onCommit?: () => void },
-): void {
-  pi.registerTool({
+export function registerTodoWriteTool(pi: ExtensionAPI, options: { onCommit?: () => void }): void {
+  pi.registerTool<typeof TodoWriteParams, TodoWriteDetails>({
     name: TOOL_WRITE,
     label: "Todo Write",
     description: TODOWRITE_DESCRIPTION,
     promptSnippet: "Replace the session todo list (full replace); track multi-step work",
     promptGuidelines: TODOWRITE_GUIDELINES,
     parameters: TodoWriteParams,
+    // No executionMode override: withStoreLock already gives every mutation
+    // mutual exclusion, and the todo tools touch no files, so forcing the whole
+    // batch sequential would only slow down unrelated sibling tools.
+    prepareArguments: (args) => prepareTodoWriteArgs(args) as TodoWriteInput,
 
     async execute(_toolCallId, params) {
       return withStoreLock(() => {
         const current = getTodos();
         const result = validateTodoWrite(params.todos, current);
-        const recoveredIds = result.ok ? result.recoveredIds ?? [] : [];
 
-        if (!result.ok) {
-          const details: TodoWriteDetails = { todos: current, error: result.error };
-          return {
-            content: [{ type: "text", text: `Error: ${result.error}` }],
-            details,
-          };
+        if (!result.ok) return errorResult(current, result.error);
+
+        const recoveredIds = result.recoveredIds ?? [];
+        const todos = result.unchanged ? result.todos : ensureTodoIds(result.todos, current);
+        const unchanged = result.unchanged || todosEqual(todos, current);
+
+        if (!unchanged) {
+          const failure = persistTodoState(pi, todos, TOOL_WRITE);
+          if (failure) return errorResult(current, failure.error, failure.message);
         }
 
-          const todos = result.unchanged ? result.todos : ensureTodoIds(result.todos, current);
-          const unchanged = result.unchanged || todosEqual(todos, current);
-          // 1. Persist durable state BEFORE updating in-memory store.
-        //    If appendEntry fails (stale ctx, persistence error), we abort
-        //    so in-memory store never diverges from durable state.
-          if (!unchanged) {
-          try {
-              pi.appendEntry(TODO_STATE_ENTRY_TYPE, { todos });
-          } catch (e) {
-            // Stale session: discard this write entirely — returning error
-            // so the LLM knows the state was not committed.
-            if (/stale after session replacement/i.test(String(e))) {
-              return {
-                content: [
-                  {
-                    type: "text",
-                    text: "Error: session was replaced — state not committed. Please retry todo_write.",
-                  },
-                ],
-                details: { todos: current, error: "stale session replacement" } satisfies TodoWriteDetails,
-              };
-            }
-            // Real persistence/disk/runtime error: propagate.
-            throw e;
-          }
-        }
-
-        // 2. Durable write succeeded (or no-op) — now update in-memory store.
-          setTodos(todos);
-
+        // Durable write succeeded (or was a no-op) — only now update memory.
+        setTodos(todos);
         options.onCommit?.();
 
-          const open = countOpenTodos(todos);
-          const summary = unchanged
-          ? "No change"
-            : `${open} open / ${todos.length} total`;
-        const recoveryNote = recoveredIds.length > 0
-          ? `Recovered stale ID(s): ${recoveredIds.join(", ")}.\n\n`
-          : "";
+        const open = countOpenTodos(todos);
+        const summary = unchanged ? "No change" : `${open} open / ${todos.length} total`;
+        const recoveryNote =
+          recoveredIds.length > 0
+            ? `Recovered stale ID(s) as new items: ${recoveredIds.join(", ")}.\n\n`
+            : "";
         const body =
-            todos.length === 0 ? `${recoveryNote}Cleared todos` : `${recoveryNote}${formatTodoListText(todos, summary)}`;
+          todos.length === 0
+            ? `${recoveryNote}Cleared todos`
+            : `${recoveryNote}${formatTodoListText(todos, summary)}`;
 
         const details: TodoWriteDetails = {
-            todos,
-            ...(recoveredIds.length > 0 ? { warnings: [`Ignored stale ID(s): ${recoveredIds.join(", ")}`] } : {}),
-            ...(unchanged ? { unchanged: true } : {}),
+          todos,
+          ...(recoveredIds.length > 0
+            ? { warnings: [`Recovered stale ID(s) as new items: ${recoveredIds.join(", ")}`] }
+            : {}),
+          ...(unchanged ? { unchanged: true } : {}),
         };
 
-        return {
-          content: [{ type: "text", text: body }],
-          details,
-        };
+        return { content: [{ type: "text", text: body }], details };
       });
     },
 
@@ -99,25 +76,20 @@ export function registerTodoWriteTool(
     },
 
     renderResult(result, _opts, theme) {
-      const details = result.details as TodoWriteDetails | undefined;
+      const details = result.details;
       if (details?.error) {
         return new Text(theme.fg("error", `Error: ${details.error}`), 0, 0);
       }
       if (details?.unchanged) {
         return new Text(theme.fg("dim", "No change"), 0, 0);
       }
-      const text = result.content[0];
-      if (!details?.error && !details?.unchanged) {
-        const open = details?.todos ? details.todos.filter((t: any) => t.status === "pending" || t.status === "in_progress").length : 0;
-        const total = details?.todos?.length ?? 0;
-          return new Text(
-            theme.fg("success", "✓ Saved") + theme.fg("muted", ` · ${open} open / ${total} total`),
-            0,
-            0,
-          );
-      }
-      const msg = text?.type === "text" ? text.text.split("\n")[0] ?? "Updated" : "Updated";
-      return new Text(theme.fg("success", "✓ ") + theme.fg("muted", msg), 0, 0);
+      const todos = details?.todos ?? [];
+      const open = countOpenTodos(todos);
+      return new Text(
+        theme.fg("success", "✓ Saved") + theme.fg("muted", ` · ${open} open / ${todos.length} total`),
+        0,
+        0,
+      );
     },
   });
 }

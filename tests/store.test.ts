@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { __resetStore, getTodos, setTodos, withStoreLock } from "../src/store.js";
 
 beforeEach(() => {
@@ -27,9 +27,7 @@ describe("withStoreLock", () => {
     const [writeResult, readResult] = await Promise.all([write, read]);
 
     expect(writeResult).toBe("written");
-    expect(readResult).toEqual([
-      { content: "from-write", status: "pending", priority: "medium" },
-    ]);
+    expect(readResult).toEqual([{ content: "from-write", status: "pending", priority: "medium" }]);
     expect(order).toEqual(["write-start", "write-end", "read-start", "read-end"]);
   });
 });

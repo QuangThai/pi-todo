@@ -1,20 +1,23 @@
-import { describe, expect, it, beforeEach } from "vitest";
-import { ensureTodoIds, validateTodoUpdate } from "../src/validate.js";
+import { beforeEach, describe, expect, it } from "vitest";
+import { __resetStore, getTodos, setTodos } from "../src/store.js";
 import { registerTodoUpdateTool } from "../src/tools/todoupdate.js";
-import { getTodos, setTodos, __resetStore } from "../src/store.js";
-import type { TodoItem } from "../src/types.js";
+import type { TodoItem, TodoWriteDetails } from "../src/types.js";
+import { ensureTodoIds, validateTodoUpdate } from "../src/validate.js";
+
+type ToolResult = { content: Array<{ type: string; text: string }>; details: TodoWriteDetails };
+type ToolExecute = (toolCallId: string, params: Record<string, unknown>) => Promise<ToolResult>;
 
 /** Mock pi for atomicity tests */
 function createMockPi(appendEntryImpl: () => void) {
-  let registeredHandler: { execute: Function } | null = null;
-  const registerTool = (opts: Record<string, unknown>) => {
-    registeredHandler = { execute: opts.execute as Function };
+  let registeredHandler: { execute: ToolExecute } | null = null;
+  const registerTool = (opts: { execute: ToolExecute }) => {
+    registeredHandler = { execute: opts.execute };
   };
   return {
     pi: { appendEntry: appendEntryImpl, registerTool } as Record<string, unknown>,
     async execute(params: Record<string, unknown>) {
       if (!registeredHandler) throw new Error("Handler not registered");
-      return registeredHandler.execute("tool_1", params) as Promise<unknown>;
+      return registeredHandler.execute("tool_1", params);
     },
   };
 }
@@ -22,19 +25,23 @@ function createMockPi(appendEntryImpl: () => void) {
 beforeEach(() => __resetStore());
 
 /** Helper: write a list of raw items (no IDs) and return the items with assigned IDs from store. */
-function seedStore(
-  raw: Array<{ content: string; status: string; priority: string }>,
-): TodoItem[] {
-  const seeded = ensureTodoIds(raw.map((r) => ({ ...r } as TodoItem)), []);
+function seedStore(raw: Array<{ content: string; status: string; priority: string }>): TodoItem[] {
+  const seeded = ensureTodoIds(
+    raw.map((r) => ({ ...r }) as TodoItem),
+    [],
+  );
   setTodos(seeded);
   return getTodos();
 }
 
 describe("todo_update validation", () => {
-  const current = ensureTodoIds([
-    { content: "One", status: "in_progress", priority: "high" },
-    { content: "Two", status: "pending", priority: "low" },
-  ], []);
+  const current = ensureTodoIds(
+    [
+      { content: "One", status: "in_progress", priority: "high" },
+      { content: "Two", status: "pending", priority: "low" },
+    ],
+    [],
+  );
 
   it("patches only the identified todo and preserves IDs", () => {
     const result = validateTodoUpdate([{ id: current[0].id, status: "completed" }], current);
@@ -54,7 +61,15 @@ describe("todo_update validation", () => {
       expect(missing.error).toContain("current IDs:");
       expect(missing.error).toContain(current[0].id!);
     }
-    expect(validateTodoUpdate([{ id: current[0].id, status: "completed" }, { id: current[0].id, priority: "low" }], current).ok).toBe(false);
+    expect(
+      validateTodoUpdate(
+        [
+          { id: current[0].id, status: "completed" },
+          { id: current[0].id, priority: "low" },
+        ],
+        current,
+      ).ok,
+    ).toBe(false);
   });
 });
 
@@ -65,13 +80,11 @@ describe("todo_update atomicity (appendEntry failure)", () => {
     });
     registerTodoUpdateTool(mock.pi as never, { onCommit: () => {} });
 
-    const existing = seedStore([
-      { content: "Safe", status: "in_progress", priority: "high" },
-    ]);
+    const existing = seedStore([{ content: "Safe", status: "in_progress", priority: "high" }]);
 
-    const result = await mock.execute({
+    const result = (await mock.execute({
       updates: [{ id: existing[0].id!, status: "completed" }],
-    }) as any;
+    })) as ToolResult;
 
     expect(result.details.error).toBeDefined();
     expect(String(result.details.error)).toContain("stale");
@@ -84,13 +97,11 @@ describe("todo_update atomicity (appendEntry failure)", () => {
     });
     registerTodoUpdateTool(mock.pi as never, { onCommit: () => {} });
 
-    const existing = seedStore([
-      { content: "Safe", status: "in_progress", priority: "medium" },
-    ]);
+    const existing = seedStore([{ content: "Safe", status: "in_progress", priority: "medium" }]);
 
-    await expect(
-      mock.execute({ updates: [{ id: existing[0].id!, priority: "low" }] }),
-    ).rejects.toThrow("disk full");
+    await expect(mock.execute({ updates: [{ id: existing[0].id!, priority: "low" }] })).rejects.toThrow(
+      "disk full",
+    );
 
     expect(getTodos()).toEqual(existing);
   });
@@ -99,13 +110,11 @@ describe("todo_update atomicity (appendEntry failure)", () => {
     const mock = createMockPi(() => {});
     registerTodoUpdateTool(mock.pi as never, { onCommit: () => {} });
 
-    const existing = seedStore([
-      { content: "Old", status: "in_progress", priority: "high" },
-    ]);
+    const existing = seedStore([{ content: "Old", status: "in_progress", priority: "high" }]);
 
-    const result = await mock.execute({
+    const result = (await mock.execute({
       updates: [{ id: existing[0].id!, status: "completed" }],
-    }) as any;
+    })) as ToolResult;
 
     expect(result.details.error).toBeUndefined();
     const stored = getTodos();

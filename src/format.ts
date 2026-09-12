@@ -4,7 +4,6 @@ import type { TodoItem, TodoStatus } from "./types.js";
 import { MAX_OVERLAY_LINES, MAX_RESULT_LINES } from "./types.js";
 import { hasOpenTodos } from "./validate.js";
 
-
 export function getTodoMarker(status: TodoStatus): string {
   switch (status) {
     case "completed":
@@ -18,13 +17,31 @@ export function getTodoMarker(status: TodoStatus): string {
   }
 }
 
-export function formatPlainTodoLine(todo: TodoItem): string {
+export interface PlainLineOptions {
+  /** Append `(priority)`. Only todo_read needs it; mutations just echoed it back. */
+  showPriority?: boolean;
+}
+
+export function formatPlainTodoLine(todo: TodoItem, options: PlainLineOptions = {}): string {
   const prefix = todo.id ? `${todo.id} ` : "";
-  return `${getTodoMarker(todo.status)} ${prefix}${todo.content}`;
+  const suffix = options.showPriority ? ` (${todo.priority})` : "";
+  return `${getTodoMarker(todo.status)} ${prefix}${todo.content}${suffix}`;
+}
+
+/**
+ * Overlay row without the ID, mirroring `formatThemedTodoLine`.
+ * The overlay is for the user, who has no use for the ID the model quotes.
+ */
+export function formatOverlayRow(todo: TodoItem): string {
+  return `${getTodoMarker(todo.status)} ${todo.content}`;
 }
 
 /** Compact checklist for tool responses; caps lines to keep LLM context small. */
-export function formatTodoListText(todos: readonly TodoItem[], summary: string): string {
+export function formatTodoListText(
+  todos: readonly TodoItem[],
+  summary: string,
+  options: PlainLineOptions = {},
+): string {
   if (todos.length === 0) return summary;
 
   // The list is a workflow timeline. Never reshuffle completed work after the
@@ -32,14 +49,14 @@ export function formatTodoListText(todos: readonly TodoItem[], summary: string):
   const ordered = [...todos];
 
   if (todos.length <= MAX_RESULT_LINES) {
-    return [summary, ...ordered.map(formatPlainTodoLine)].join("\n");
+    return [summary, ...ordered.map((todo) => formatPlainTodoLine(todo, options))].join("\n");
   }
   const shown = ordered.slice(0, MAX_RESULT_LINES);
   const hidden = ordered.length - MAX_RESULT_LINES;
   return [
     summary,
-    ...shown.map(formatPlainTodoLine),
-    `… and ${hidden} more (full list in details/JSON)`,
+    ...shown.map((todo) => formatPlainTodoLine(todo, options)),
+    `… and ${hidden} more (full list in details)`,
   ].join("\n");
 }
 
@@ -64,8 +81,6 @@ export interface OverlayLayout {
   /** Active item repeated below the timeline when it is outside the visible prefix. */
   pinnedActive?: TodoItem;
   hiddenCount: number;
-  /** Retained for consumers of the layout API; terminal items are no longer regrouped. */
-  terminalCount: number;
 }
 
 /**
@@ -78,13 +93,13 @@ export function selectOverlayLayout(
   maxLines: number = MAX_OVERLAY_LINES,
 ): OverlayLayout {
   if (!shouldShowOverlay(todos)) {
-    return { visible: [], hiddenCount: 0, terminalCount: 0 };
+    return { visible: [], hiddenCount: 0 };
   }
 
   const bodyBudget = Math.max(1, maxLines - 1);
   if (todos.length <= bodyBudget) {
     // All fit — show the canonical checklist sequence unchanged.
-    return { visible: [...todos], hiddenCount: 0, terminalCount: 0 };
+    return { visible: [...todos], hiddenCount: 0 };
   }
 
   const active = todos.find((todo) => todo.status === "in_progress");
@@ -101,15 +116,18 @@ export function selectOverlayLayout(
   }
 
   const hiddenCount = todos.length - visible.length - (pinnedActive ? 1 : 0);
-  return { visible, pinnedActive, hiddenCount, terminalCount: 0 };
+  return { visible, pinnedActive, hiddenCount };
 }
 
 export interface RenderOverlayOptions {
   maxLines?: number;
 }
 
+const FIRST_PREFIX = "└ ";
+const NEXT_PREFIX = "  ";
+
 /**
- * The overlay is hidden when no work remains open.
+ * Themed overlay body for the TUI widget. Empty when no work remains open.
  */
 export function renderOverlayLines(
   todos: readonly TodoItem[],
@@ -127,20 +145,48 @@ export function renderOverlayLines(
   const layout = selectOverlayLayout(todos, Math.max(3, maxLines - 1));
   const lines: string[] = [heading];
 
-  const FIRST = "└ ";
-  const NEXT = "  ";
   for (let i = 0; i < layout.visible.length; i++) {
-    const prefix = i === 0 ? FIRST : NEXT;
+    const prefix = i === 0 ? FIRST_PREFIX : NEXT_PREFIX;
     lines.push(truncate(prefix + formatThemedTodoLine(layout.visible[i], theme)));
   }
   if (layout.pinnedActive) {
     lines.push(
-      truncate(NEXT + theme.fg("warning", `Active: ${formatPlainTodoLine(layout.pinnedActive)}`)),
+      truncate(NEXT_PREFIX + theme.fg("warning", `Active: ${formatPlainTodoLine(layout.pinnedActive)}`)),
     );
   }
   if (layout.hiddenCount > 0) {
-    lines.push(truncate(NEXT + theme.fg("dim", `+${layout.hiddenCount} more`)));
+    lines.push(truncate(NEXT_PREFIX + theme.fg("dim", `+${layout.hiddenCount} more`)));
   }
   lines.push("");
+  return lines.slice(0, maxLines);
+}
+
+/**
+ * Unthemed overlay body, for hosts that cannot run a component factory.
+ *
+ * RPC mode drops factory widgets entirely (`setWidget` there only forwards a
+ * string array), so without this the overlay is invisible to every non-TUI
+ * front end. Same layout as the themed renderer, minus the escape codes.
+ */
+export function renderOverlayPlainLines(
+  todos: readonly TodoItem[],
+  options: RenderOverlayOptions = {},
+): string[] {
+  if (!shouldShowOverlay(todos)) return [];
+
+  const maxLines = Math.max(1, options.maxLines ?? MAX_OVERLAY_LINES);
+  const layout = selectOverlayLayout(todos, Math.max(3, maxLines - 1));
+  const lines: string[] = ["Updated Plan"];
+
+  for (let i = 0; i < layout.visible.length; i++) {
+    const prefix = i === 0 ? FIRST_PREFIX : NEXT_PREFIX;
+    lines.push(prefix + formatOverlayRow(layout.visible[i]));
+  }
+  if (layout.pinnedActive) {
+    lines.push(`${NEXT_PREFIX}Active: ${formatPlainTodoLine(layout.pinnedActive)}`);
+  }
+  if (layout.hiddenCount > 0) {
+    lines.push(`${NEXT_PREFIX}+${layout.hiddenCount} more`);
+  }
   return lines.slice(0, maxLines);
 }

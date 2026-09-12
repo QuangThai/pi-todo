@@ -1,6 +1,12 @@
-import { sanitizeTodoText } from "./sanitize.js";
+import { clampTodoText, sanitizeTodoText } from "./sanitize.js";
 import type { TodoItem, TodoPriority, TodoStatus } from "./types.js";
-import { MAX_CONTENT_LENGTH, MAX_TODO_ITEMS, TODO_PRIORITIES, TODO_STATUSES } from "./types.js";
+import {
+  DEFAULT_PRIORITY,
+  MAX_CONTENT_LENGTH,
+  MAX_TODO_ITEMS,
+  TODO_PRIORITIES,
+  TODO_STATUSES,
+} from "./types.js";
 
 /** Short sequential IDs (`t1`, `t2`, …) — easy for LLMs to copy; avoids UUID typos. */
 export function nextShortTodoId(used: ReadonlySet<string>): string {
@@ -36,7 +42,10 @@ export function todosEqual(a: readonly TodoItem[], b: readonly TodoItem[]): bool
   if (a.length !== b.length) return false;
   return a.every(
     (item, i) =>
-        item.id === b[i].id && item.content === b[i].content && item.status === b[i].status && item.priority === b[i].priority,
+      item.id === b[i].id &&
+      item.content === b[i].content &&
+      item.status === b[i].status &&
+      item.priority === b[i].priority,
   );
 }
 
@@ -45,10 +54,7 @@ export function todosEqual(a: readonly TodoItem[], b: readonly TodoItem[]): bool
  * Hard-enforces at most one `in_progress`; stale IDs are normalized as new items.
  * Does not mutate `current`.
  */
-export function validateTodoWrite(
-  rawTodos: unknown,
-  current: readonly TodoItem[],
-): ValidateResult {
+export function validateTodoWrite(rawTodos: unknown, current: readonly TodoItem[]): ValidateResult {
   if (!Array.isArray(rawTodos)) {
     return { ok: false, error: "todos must be an array" };
   }
@@ -72,12 +78,9 @@ export function validateTodoWrite(
     if (typeof rec.content !== "string") {
       return { ok: false, error: `todos[${i}].content must be a string` };
     }
-    let content = sanitizeTodoText(rec.content);
+    const content = clampTodoText(sanitizeTodoText(rec.content), MAX_CONTENT_LENGTH);
     if (!content) {
       return { ok: false, error: `todos[${i}].content must be non-empty` };
-    }
-    if (content.length > MAX_CONTENT_LENGTH) {
-      content = `${content.slice(0, MAX_CONTENT_LENGTH - 1)}…`;
     }
 
     if (!isStatus(rec.status)) {
@@ -86,11 +89,17 @@ export function validateTodoWrite(
         error: `todos[${i}].status must be one of: ${TODO_STATUSES.join(", ")}`,
       };
     }
-    if (!isPriority(rec.priority)) {
-      return {
-        ok: false,
-        error: `todos[${i}].priority must be one of: ${TODO_PRIORITIES.join(", ")}`,
-      };
+    // `priority` is optional in the schema: it is metadata the model often skips,
+    // and rejecting the whole call over it costs a turn for no benefit.
+    let priority: TodoPriority = DEFAULT_PRIORITY;
+    if (rec.priority !== undefined) {
+      if (!isPriority(rec.priority)) {
+        return {
+          ok: false,
+          error: `todos[${i}].priority must be one of: ${TODO_PRIORITIES.join(", ")}`,
+        };
+      }
+      priority = rec.priority;
     }
 
     if (rec.status === "in_progress") inProgressCount += 1;
@@ -112,7 +121,7 @@ export function validateTodoWrite(
         recoveredIds.push(rec.id);
       }
     }
-    todos.push({ ...(id ? { id } : {}), content, status: rec.status, priority: rec.priority });
+    todos.push({ ...(id ? { id } : {}), content, status: rec.status, priority });
   }
 
   if (inProgressCount > 1) {
@@ -143,11 +152,11 @@ export function validateTodoWrite(
 export function ensureTodoIds(todos: readonly TodoItem[], current: readonly TodoItem[]): TodoItem[] {
   // Reserve every explicit ID up front. Incoming order must not decide whether an
   // id-less item steals an ID that a later item explicitly retains.
-  const reserved = new Set(todos.flatMap((todo) => todo.id ? [todo.id] : []));
+  const reserved = new Set(todos.flatMap((todo) => (todo.id ? [todo.id] : [])));
   const claimed = new Set<string>();
   // Avoid reusing any current ID in this pass — a later id-less item may still
   // match it by tuple/content. Freed IDs become reusable on the next write.
-  const currentIds = new Set(current.flatMap((todo) => todo.id ? [todo.id] : []));
+  const currentIds = new Set(current.flatMap((todo) => (todo.id ? [todo.id] : [])));
 
   // Pre-index content uniqueness: content that appears only once in `current`
   // is safe for content-only fallback.
@@ -161,7 +170,10 @@ export function ensureTodoIds(todos: readonly TodoItem[], current: readonly Todo
     if (!id) {
       // 1. Exact tuple match (content + status + priority)
       const byTuple = current.find(
-          (c) => !!c.id && !reserved.has(c.id) && !claimed.has(c.id) &&
+        (c) =>
+          !!c.id &&
+          !reserved.has(c.id) &&
+          !claimed.has(c.id) &&
           c.content === todo.content &&
           c.status === todo.status &&
           c.priority === todo.priority,
@@ -173,7 +185,7 @@ export function ensureTodoIds(todos: readonly TodoItem[], current: readonly Todo
         const count = contentCounts.get(todo.content) ?? 0;
         if (count === 1) {
           const byContent = current.find(
-              (c) => !!c.id && !reserved.has(c.id) && !claimed.has(c.id) && c.content === todo.content,
+            (c) => !!c.id && !reserved.has(c.id) && !claimed.has(c.id) && c.content === todo.content,
           );
           if (byContent) id = byContent.id;
         }
@@ -218,7 +230,8 @@ export function validateTodoUpdate(rawUpdates: unknown, current: readonly TodoIt
     const update = rawUpdates[i];
     if (!update || typeof update !== "object") return { ok: false, error: `updates[${i}] must be an object` };
     const rec = update as Record<string, unknown>;
-    if (typeof rec.id !== "string" || !rec.id) return { ok: false, error: `updates[${i}].id must be a non-empty string` };
+    if (typeof rec.id !== "string" || !rec.id)
+      return { ok: false, error: `updates[${i}].id must be a non-empty string` };
     if (seen.has(rec.id)) return { ok: false, error: `updates[${i}].id is duplicated` };
     seen.add(rec.id);
     const target = next.find((todo) => todo.id === rec.id);
@@ -254,7 +267,7 @@ export function countOpenTodos(todos: readonly TodoItem[]): number {
   return todos.filter(isOpenTodo).length;
 }
 
-/** Count of `in_progress` items (shown as "running" in the overlay heading). */
+/** Count of `in_progress` items (shown as "running" by the /todos command). */
 export function countRunningTodos(todos: readonly TodoItem[]): number {
   return todos.filter((t) => t.status === "in_progress").length;
 }
