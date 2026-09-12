@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { sanitizeTodoText } from "../src/sanitize.js";
-import { ensureTodoIds, getTodoIntegrityIssues, validateTodoWrite, hasOpenTodos, todosEqual } from "../src/validate.js";
 import { MAX_TODO_ITEMS, type TodoItem } from "../src/types.js";
+import {
+  ensureTodoIds,
+  getTodoIntegrityIssues,
+  hasOpenTodos,
+  todosEqual,
+  validateTodoWrite,
+} from "../src/validate.js";
 
 const sample = (overrides: Partial<TodoItem> = {}): TodoItem => ({
   content: "Do thing",
@@ -23,10 +29,7 @@ describe("sanitizeTodoText", () => {
 describe("validateTodoWrite", () => {
   it("rejects >1 in_progress (A1)", () => {
     const result = validateTodoWrite(
-      [
-        sample({ content: "a", status: "in_progress" }),
-        sample({ content: "b", status: "in_progress" }),
-      ],
+      [sample({ content: "a", status: "in_progress" }), sample({ content: "b", status: "in_progress" })],
       [],
     );
     expect(result.ok).toBe(false);
@@ -54,17 +57,22 @@ describe("validateTodoWrite", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("rejects missing priority (A8)", () => {
+  it("defaults a missing priority to medium (A8)", () => {
+    // Priority is optional on purpose: it is metadata models routinely omit, and
+    // failing the whole call over it costs a turn for no benefit.
     const result = validateTodoWrite([{ content: "x", status: "pending" }], []);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.todos[0].priority).toBe("medium");
+  });
+
+  it("still rejects a priority that is present but invalid", () => {
+    const result = validateTodoWrite([{ content: "x", status: "pending", priority: "P1" }], []);
     expect(result.ok).toBe(false);
   });
 
   it("flags unchanged rewrite (A11)", () => {
     const current = [sample({ content: "a", status: "in_progress", priority: "high" })];
-    const result = validateTodoWrite(
-      [{ content: "a", status: "in_progress", priority: "high" }],
-      current,
-    );
+    const result = validateTodoWrite([{ content: "a", status: "in_progress", priority: "high" }], current);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.unchanged).toBe(true);
   });
@@ -80,10 +88,7 @@ describe("validateTodoWrite", () => {
 
   it("truncates content over MAX_CONTENT_LENGTH", () => {
     const long = "x".repeat(600);
-    const result = validateTodoWrite(
-      [{ content: long, status: "pending", priority: "low" }],
-      [],
-    );
+    const result = validateTodoWrite([{ content: long, status: "pending", priority: "low" }], []);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.todos[0].content.length).toBe(500);
@@ -95,10 +100,7 @@ describe("validateTodoWrite", () => {
 describe("hasOpenTodos / todosEqual", () => {
   it("hasOpenTodos false when all terminal", () => {
     expect(
-      hasOpenTodos([
-        sample({ status: "completed" }),
-        sample({ content: "x", status: "cancelled" }),
-      ]),
+      hasOpenTodos([sample({ status: "completed" }), sample({ content: "x", status: "cancelled" })]),
     ).toBe(false);
   });
 
@@ -152,9 +154,7 @@ describe("validateTodoWrite duplicate IDs", () => {
   });
 
   it("recovers unknown ids as new items", () => {
-    const current: TodoItem[] = [
-      { id: "known-1", content: "existing", status: "pending", priority: "high" },
-    ];
+    const current: TodoItem[] = [{ id: "known-1", content: "existing", status: "pending", priority: "high" }];
     const result = validateTodoWrite(
       [
         { content: "existing", status: "pending", priority: "high", id: "known-1" },
@@ -205,8 +205,8 @@ describe("ensureTodoIds", () => {
     ];
     const result = ensureTodoIds(incoming, current);
     // Reordered but should match by tuple, not index
-    expect(result[0].id).toBe("a2");   // in_progress/low → "a2"
-    expect(result[1].id).toBe("a1");   // pending/high → "a1"
+    expect(result[0].id).toBe("a2"); // in_progress/low → "a2"
+    expect(result[1].id).toBe("a1"); // pending/high → "a1"
   });
 
   it("rejects a list larger than the payload limit", () => {
@@ -240,7 +240,7 @@ describe("ensureTodoIds", () => {
       { id: "a2", content: "Same", status: "pending" as const, priority: "high" as const },
     ];
     const incoming = [
-      { content: "Same", status: "completed" as const, priority: "high" as const },  // tuple doesn't match
+      { content: "Same", status: "completed" as const, priority: "high" as const }, // tuple doesn't match
     ];
     const result = ensureTodoIds(incoming, current);
     // Content is not unique in current → should get fresh short ID, not borrow
@@ -274,7 +274,7 @@ describe("ensureTodoIds", () => {
       { id: "other", content: "Other", status: "completed" as const, priority: "low" as const },
     ];
     const incoming = [
-      { content: "Unique task", status: "completed" as const, priority: "medium" as const },  // status changed
+      { content: "Unique task", status: "completed" as const, priority: "medium" as const }, // status changed
     ];
     const result = ensureTodoIds(incoming, current);
     // Tuple doesn't match (different status) but content is unique → fallback borrows "uniq"
@@ -284,13 +284,12 @@ describe("ensureTodoIds", () => {
 
 describe("getTodoIntegrityIssues", () => {
   it("reports missing and duplicate stable IDs", () => {
-    expect(getTodoIntegrityIssues([
-      sample({ id: "dup" }),
-      sample({ id: "dup", content: "Other" }),
-      sample({ content: "Legacy" }),
-    ])).toEqual([
-      'todos[1].id "dup" is duplicated',
-      "todos[2] has no stable ID",
-    ]);
+    expect(
+      getTodoIntegrityIssues([
+        sample({ id: "dup" }),
+        sample({ id: "dup", content: "Other" }),
+        sample({ content: "Legacy" }),
+      ]),
+    ).toEqual(['todos[1].id "dup" is duplicated', "todos[2] has no stable ID"]);
   });
 });

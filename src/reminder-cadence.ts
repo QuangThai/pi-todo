@@ -1,11 +1,16 @@
 /**
  * Pure cadence logic for system-reminder injection (ported from tintinweb/pi-tasks).
  *
- * tool_result tracks cadence only — never mutates tool output.
- * context drains the pending reminder into a transient user message for one LLM call.
+ * tool_result tracks cadence only — it never mutates tool output.
+ * context drains the pending reminder into a transient message for one LLM call.
  *
- * Reminder body is state-aware (edxeth/meh pi-tasks pattern): list open todos only,
- * and call out the in_progress item so the model updates completed status.
+ * The reminder body is state-aware (edxeth/meh pi-tasks pattern): it lists open
+ * todos only, and calls out the in_progress item so the model updates status.
+ *
+ * Cadence contract: at most one reminder per `reminderInterval` turns while open
+ * work remains. Draining re-bases the window, so a reminder the model ignores is
+ * re-armed one interval later instead of silencing the extension for the rest of
+ * the session.
  */
 
 import { formatPlainTodoLine } from "./format.js";
@@ -15,7 +20,6 @@ import { hasOpenTodos, isOpenTodo } from "./validate.js";
 export interface CadenceState {
   currentTurn: number;
   lastTodoToolUseTurn: number;
-  reminderInjectedThisCycle: boolean;
   reminderDue: boolean;
 }
 
@@ -30,7 +34,6 @@ export function createCadenceState(): CadenceState {
   return {
     currentTurn: 0,
     lastTodoToolUseTurn: 0,
-    reminderInjectedThisCycle: false,
     reminderDue: false,
   };
 }
@@ -38,7 +41,6 @@ export function createCadenceState(): CadenceState {
 export function resetCadenceState(state: CadenceState): void {
   state.currentTurn = 0;
   state.lastTodoToolUseTurn = 0;
-  state.reminderInjectedThisCycle = false;
   state.reminderDue = false;
 }
 
@@ -46,11 +48,16 @@ export function onTurnStart(state: CadenceState): void {
   state.currentTurn++;
 }
 
+/** True when enough turns have passed since the last todo-tool call or reminder. */
+export function isReminderWindowOpen(state: CadenceState, config: CadenceConfig): boolean {
+  return state.currentTurn - state.lastTodoToolUseTurn >= config.reminderInterval;
+}
+
 /**
- * Decide cadence change from a tool_result. Mutates state; returns whether
- * the reminder should be queued for the next context event.
+ * Decide the cadence change from a tool_result. Mutates state; returns whether
+ * the reminder is now queued for the next context event.
  *
- * `hasOpenWork` must reflect pending/in_progress only — all-terminal lists
+ * `hasOpenWork` must reflect pending/in_progress only — an all-terminal list
  * should not re-arm reminders (OpenCode: done means overlay gone).
  */
 export function evaluateToolResult(
@@ -61,26 +68,26 @@ export function evaluateToolResult(
 ): { markDue: boolean } {
   if (config.todoToolNames.has(toolName)) {
     state.lastTodoToolUseTurn = state.currentTurn;
-    state.reminderInjectedThisCycle = false;
     state.reminderDue = false;
     return { markDue: false };
   }
 
-  if (state.currentTurn - state.lastTodoToolUseTurn < config.reminderInterval) {
-    return { markDue: false };
-  }
-  if (state.reminderInjectedThisCycle) return { markDue: false };
+  if (!isReminderWindowOpen(state, config)) return { markDue: false };
   if (!hasOpenWork) return { markDue: false };
 
   state.reminderDue = true;
   return { markDue: true };
 }
 
-/** Drain pending reminder when `context` fires. */
+/**
+ * Drain the pending reminder when `context` fires.
+ *
+ * Re-bases the window on the current turn, which both prevents a second
+ * injection for the same window and schedules the next one an interval later.
+ */
 export function drainReminderForContext(state: CadenceState): boolean {
   if (!state.reminderDue) return false;
   state.reminderDue = false;
-  state.reminderInjectedThisCycle = true;
   state.lastTodoToolUseTurn = state.currentTurn;
   return true;
 }
@@ -97,7 +104,7 @@ export function buildSystemReminder(todos: readonly TodoItem[]): string | null {
 
   const open = todos.filter(isOpenTodo);
   const inProgress = open.filter((t) => t.status === "in_progress");
-  const lines = open.map(formatPlainTodoLine);
+  const lines = open.map((todo) => formatPlainTodoLine(todo));
 
   const focus =
     inProgress.length > 0

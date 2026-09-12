@@ -1,13 +1,8 @@
-import { describe, expect, it, beforeEach } from "vitest";
-import { getTodos, setTodos, clearTodos, __resetStore } from "../src/store.js";
-import { validateTodoWrite, todosEqual } from "../src/validate.js";
-import {
-  formatTodoListText,
-  renderOverlayLines,
-  shouldShowOverlay,
-  selectOverlayLayout,
-} from "../src/format.js";
+import { beforeEach, describe, expect, it } from "vitest";
+import { formatTodoListText, renderOverlayLines, shouldShowOverlay } from "../src/format.js";
+import { __resetStore, getTodos, setTodos } from "../src/store.js";
 import type { TodoItem } from "../src/types.js";
+import { todosEqual, validateTodoWrite } from "../src/validate.js";
 
 const identityTheme = {
   fg: (_c: string, s: string) => s,
@@ -57,9 +52,7 @@ describe("write→read roundtrip", () => {
   });
 
   it("detects unchanged todos", () => {
-    const raw = [
-      { content: "Task", status: "pending", priority: "medium" },
-    ];
+    const raw = [{ content: "Task", status: "pending", priority: "medium" }];
     const r1 = validateTodoWrite(raw, getTodos());
     expect(r1.ok).toBe(true);
     if (r1.ok) setTodos(r1.todos);
@@ -129,11 +122,7 @@ describe("validate→store→format integration", () => {
   });
 
   it("overlay keeps store counts while retaining stored items", () => {
-    setTodos([
-      t("done", "completed"),
-      t("active", "in_progress"),
-      t("next", "pending"),
-    ]);
+    setTodos([t("done", "completed"), t("active", "in_progress"), t("next", "pending")]);
 
     const lines = renderOverlayLines(getTodos(), identityTheme, 80);
     expect(lines[0]).toBe("Updated Plan");
@@ -196,10 +185,7 @@ describe("empty/edge integration", () => {
 
   it("valid write replaces store even if priorities differ", () => {
     setTodos([t("old", "in_progress")]);
-    const r = validateTodoWrite(
-      [{ content: "new", status: "in_progress", priority: "low" }],
-      getTodos(),
-    );
+    const r = validateTodoWrite([{ content: "new", status: "in_progress", priority: "low" }], getTodos());
     expect(r.ok).toBe(true);
     if (r.ok) {
       setTodos(r.todos);
