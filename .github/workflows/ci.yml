@@ -6,13 +6,25 @@ on:
   pull_request:
     branches: [main]
 
+# A workflow that only reads the repo should say so.
+permissions:
+  contents: read
+
+# Superseded runs on the same ref are wasted minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
-        node-version: [20, 22]
+        # pi itself requires Node >=22.19, so testing on 20 proved nothing about
+        # the runtime this extension actually loads in.
+        node-version: [22, 24]
 
     steps:
       - uses: actions/checkout@v4
@@ -21,12 +33,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Lint and format check
+        run: npm run lint
 
       - name: Type check
         run: npm run typecheck
 
       - name: Run tests
         run: npm test
+
+      - name: Coverage
+        if: matrix.node-version == 22
+        run: npm run test:coverage
