@@ -1,5 +1,100 @@
 # Changelog
 
+## 0.7.0 (2026-09-12)
+
+A repo-wide audit against pi's extension docs. Two user-visible bugs, one
+significant cost regression, and the surfaces that were missing.
+
+### Fixed
+
+- **Ghost overlay.** The widget component treated `invalidate()` as "you were
+  removed", but pi calls it from `ui.invalidate()` on every theme change to mean
+  "drop cached rendering state". The registration flag then disagreed with pi's
+  widget map, so the `setWidget(key, undefined)` that hides a finished checklist
+  never fired and the overlay stayed pinned above the editor for the rest of the
+  session. Registration state is now only changed next to the `setWidget` call
+  that causes it, and the component also implements `dispose()`.
+- **No overlay outside the TUI.** pi's RPC transport forwards only the
+  string-array form of `setWidget` and silently drops component factories, so
+  every non-TUI front end saw nothing. The same layout is now sent as plain
+  lines when `ctx.mode !== "tui"`.
+- **Prompt cache invalidation.** The system prompt was extended or not depending
+  on how each user prompt classified. pi renders `tools` -> `system` ->
+  `messages` and the provider caches that prefix, so every classification flip
+  invalidated the entire cached conversation. The system prompt is now byte-stable
+  for a whole session; situational text is a transient tail message.
+- **Unbounded tool output.** `todo_read` and `todo_diagnose` appended a
+  pretty-printed JSON dump with no size limit; at the schema's maximum (200 items
+  x 500 chars) that overran pi's documented 50KB / 2000-line tool-output budget.
+- **Rejected mutations cleared the completion nudge.** A returned error envelope
+  does not set `isError` — only a thrown error does — so failure is now detected
+  from `details.error`.
+- **A single ignored reminder silenced the session.** The cadence latch persisted
+  until a todo tool was called. Draining now re-bases the window, so a reminder
+  re-arms one interval later.
+- Overlay row rendering is consistent between the themed and plain renderers.
+- `content` is clamped without splitting a surrogate pair, and bidi/zero-width
+  characters are stripped so stored text cannot render as something else.
+- Text echoed into a `<system-reminder>` has its angle brackets neutralized, so
+  a smuggled closing tag cannot escape the reminder.
+
+### Changed
+
+- **Context cost cut from ~1.75k to ~580 tokens per request.** The ID rule was
+  stated in four places and the parallel-batch warning in three. Each rule now
+  has one home: policy in the tool description, the few always-on lines in
+  `promptGuidelines`, field descriptions in the schema. A test guards the budget.
+- **`priority` is now optional**, defaulting to `medium`. It is metadata models
+  routinely omit, and failing the call over it cost a turn for no benefit.
+- **`todo_read` returns one representation**, a compact checklist with IDs and
+  priorities, instead of a checklist plus a duplicate JSON copy.
+- **`todo_diagnose` is now the `/todo-diagnose` command** (breaking). The model
+  never needed it, and as a tool it spent description and schema tokens on every
+  request.
+- `prepareArguments` coerces the near-misses models actually produce
+  (`status: "done"`, `priority: "P1"`, `text` for `content`, a bare object or a
+  JSON string) before schema validation.
+- Tools declare their `details` type through `registerTool`'s generics, removing
+  the `as any` casts in the renderers — which is what surfaced the unreachable
+  branch in `todo_write`'s `renderResult`.
+- Overlay budget aligned to pi's own `MAX_WIDGET_LINES` (12 -> 10).
+- Stale-ID wording is consistent: "Recovered stale ID(s) as new items".
+
+### Added
+
+- `/todos` shows the full list including finished items, `/todos reset` clears it
+  after confirmation, and `/todos reminders on|off` toggles the nudges.
+- `--no-todo-nudges` flag, and a footer status showing `todos done/total`.
+- `tests/e2e-real-pi.test.ts`: 16 tests against the real pi runtime — real
+  extension loader, tool registry, agent loop, session replay and `ctx.ui` — with
+  only the model stubbed via the documented `pi.registerProvider({ streamSimple })`
+  API. Each behavioural fix above was confirmed to fail these tests when reverted.
+- Widget lifecycle tests, renderer tests, coercion tests, and sanitize tests.
+- Biome (lint + format), coverage thresholds, and a `npm run check` script.
+
+### Removed
+
+- Dead exports with no production caller: `shouldNudgeColdStart`,
+  `shouldNudgeCompletionUpdate`, `isTerminalList`, and the vestigial
+  `OverlayLayout.terminalCount`.
+- The `<Task_Management>` system-prompt section and its cold-start boost, whose
+  job is now done by the stable `promptGuidelines` plus the tail-message nudge.
+
+### Repo
+
+- `engines.node` set to `>=22.19.0`, matching pi. CI now tests Node 22 and 24
+  (20 is below pi's floor), with npm caching, least-privilege `permissions`, a
+  concurrency group, and a lint step.
+- Dev dependencies moved from pi 0.80.7 to **0.85.1**, and the whole suite was
+  re-verified there. This mattered: the audit was originally done against 0.80.7
+  while a real install runs 0.85.1, and `AuthStorage` / `ModelRegistry.inMemory`
+  had been replaced by `ModelRuntime` in between. `src/` needed no change — every
+  extension API it uses is unchanged, including the two this release depends on
+  (`invalidate()` still means "drop cached rendering state", and RPC still drops
+  component factories) — but the test harness did, and pinning dev deps to a
+  version older than the runtime is how that stays invisible.
+
+
 ## 0.6.3 (2026-09-01)
 
 ### Reverted
